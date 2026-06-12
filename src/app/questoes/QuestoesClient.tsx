@@ -37,6 +37,8 @@ function QuestionCard({
   const [revealed, setRevealed] = useState(!!userAnswer?.resposta)
 
   const area = question.areas as unknown as Area | undefined
+  const vestibular = question.vestibulares as unknown as Vestibular | undefined
+  const areaColor = area?.color ?? '#5c5cff'
 
   function handleAnswer(letra: string) {
     if (revealed) return
@@ -56,43 +58,70 @@ function QuestionCard({
     <div className="card p-6 md:p-8 animate-[fadeIn_0.3s_ease-out]">
       <div className="flex flex-wrap items-center gap-2 mb-4">
         {area && (
-          <span className="badge"
-            style={{ background: area.color + '22', color: area.color, border: `1px solid ${area.color}44` }}>
+          <span
+            className="badge"
+            style={{
+              background: areaColor + '22',
+              color: areaColor,
+              border: `1px solid ${areaColor}44`,
+            }}
+          >
             {area.icon} {area.name}
           </span>
         )}
-        <span className="badge"
-          style={{ background: 'rgba(92,92,255,0.12)', color: '#a3a3ff', border: '1px solid rgba(92,92,255,0.2)' }}>
-          {(question.vestibulares as unknown as { name: string } | undefined)?.name} {question.ano}
+        <span
+          className="badge"
+          style={{ background: 'rgba(92,92,255,0.12)', color: '#a3a3ff', border: '1px solid rgba(92,92,255,0.2)' }}
+        >
+          {vestibular?.name} {question.ano}
         </span>
         {question.numero && (
-          <span className="badge"
-            style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <span
+            className="badge"
+            style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.07)' }}
+          >
             Q{question.numero}
           </span>
         )}
-        <span className="badge ml-auto"
+        <span
+          className="badge ml-auto"
           style={{
-            background: question.dificuldade === 'facil' ? 'rgba(34,197,94,0.12)' :
-              question.dificuldade === 'dificil' ? 'rgba(239,68,68,0.1)' : 'rgba(251,191,36,0.1)',
-            color: question.dificuldade === 'facil' ? '#86efac' :
-              question.dificuldade === 'dificil' ? '#fca5a5' : '#fde68a',
-            border: `1px solid ${question.dificuldade === 'facil' ? 'rgba(34,197,94,0.25)' :
-              question.dificuldade === 'dificil' ? 'rgba(239,68,68,0.2)' : 'rgba(251,191,36,0.2)'}`
-          }}>
+            background:
+              question.dificuldade === 'facil'
+                ? 'rgba(34,197,94,0.12)'
+                : question.dificuldade === 'dificil'
+                ? 'rgba(239,68,68,0.1)'
+                : 'rgba(251,191,36,0.1)',
+            color:
+              question.dificuldade === 'facil'
+                ? '#86efac'
+                : question.dificuldade === 'dificil'
+                ? '#fca5a5'
+                : '#fde68a',
+            border: `1px solid ${
+              question.dificuldade === 'facil'
+                ? 'rgba(34,197,94,0.25)'
+                : question.dificuldade === 'dificil'
+                ? 'rgba(239,68,68,0.2)'
+                : 'rgba(251,191,36,0.2)'
+            }`,
+          }}
+        >
           {question.dificuldade}
         </span>
       </div>
 
       {question.contexto && (
-        <div className="p-4 rounded-xl mb-4 text-sm text-[var(--text-secondary)] leading-relaxed"
-          style={{ background: 'rgba(255,255,255,0.03)', borderLeft: '2px solid rgba(92,92,255,0.4)' }}>
+        <div
+          className="p-4 rounded-xl mb-4 text-sm text-[var(--text-secondary)] leading-relaxed"
+          style={{ background: 'rgba(255,255,255,0.03)', borderLeft: '2px solid rgba(92,92,255,0.4)' }}
+        >
           {question.contexto}
         </div>
       )}
 
       {question.imagem_url && (
-        <div className="mb-4 rounded-xl overflow-hidden relative w-full" style={{ maxHeight: 400 }}>
+        <div className="mb-4 rounded-xl overflow-hidden">
           <Image
             src={question.imagem_url}
             alt="Imagem da questão"
@@ -107,24 +136,34 @@ function QuestionCard({
 
       <div className="space-y-2">
         {question.alternativas.map((alt) => (
-          <button key={alt.letra}
+          <button
+            key={alt.letra}
             onClick={() => handleAnswer(alt.letra)}
             className={`alt-option w-full text-left ${getAltClass(alt.letra)}`}
-            disabled={revealed}>
-            <span className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold"
-              style={{ background: 'rgba(92,92,255,0.15)', color: '#a3a3ff' }}>
+            disabled={revealed}
+          >
+            <span
+              className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold"
+              style={{ background: 'rgba(92,92,255,0.15)', color: '#a3a3ff' }}
+            >
               {alt.letra}
             </span>
             <span className="text-sm text-[var(--text-secondary)] flex-1 leading-relaxed">{alt.texto}</span>
-            {revealed && alt.letra === question.gabarito && <CheckCircle size={16} className="text-[#22c55e] flex-shrink-0" />}
-            {revealed && alt.letra === selected && alt.letra !== question.gabarito && <XCircle size={16} className="text-[#ef4444] flex-shrink-0" />}
+            {revealed && alt.letra === question.gabarito && (
+              <CheckCircle size={16} className="text-[#22c55e] flex-shrink-0" />
+            )}
+            {revealed && alt.letra === selected && alt.letra !== question.gabarito && (
+              <XCircle size={16} className="text-[#ef4444] flex-shrink-0" />
+            )}
           </button>
         ))}
       </div>
 
       {revealed && question.explicacao && (
-        <div className="mt-6 p-4 rounded-xl text-sm leading-relaxed animate-[slideUp_0.3s_ease-out]"
-          style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)' }}>
+        <div
+          className="mt-6 p-4 rounded-xl text-sm leading-relaxed animate-[slideUp_0.3s_ease-out]"
+          style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)' }}
+        >
           <div className="font-semibold text-[#86efac] mb-2 flex items-center gap-2">
             <BookOpen size={14} /> Resolução
           </div>
@@ -135,7 +174,16 @@ function QuestionCard({
   )
 }
 
-export default function QuestoesClient({ questions, areas, vestibulares, userAnswers, total, page, pageSize, filters }: Props) {
+export default function QuestoesClient({
+  questions,
+  areas,
+  vestibulares,
+  userAnswers,
+  total,
+  page,
+  pageSize,
+  filters,
+}: Props) {
   const router = useRouter()
   const supabase = createClient()
   const totalPages = Math.ceil(total / pageSize)
@@ -178,24 +226,40 @@ export default function QuestoesClient({ questions, areas, vestibulares, userAns
 
       <div className="card p-4 flex flex-wrap gap-3 items-center">
         <Filter size={14} className="text-[var(--text-muted)]" />
-        <select className="input w-auto text-sm py-2"
+        <select
+          className="input w-auto text-sm py-2"
           value={filters.area ?? ''}
-          onChange={(e) => e.target.value ? updateFilter('area', e.target.value) : clearFilter('area')}>
+          onChange={(e) => (e.target.value ? updateFilter('area', e.target.value) : clearFilter('area'))}
+        >
           <option value="">Todas as disciplinas</option>
-          {areas.map((a) => <option key={a.id} value={a.slug}>{a.icon} {a.name}</option>)}
+          {areas.map((a) => (
+            <option key={a.id} value={a.slug}>
+              {a.icon} {a.name}
+            </option>
+          ))}
         </select>
-        <select className="input w-auto text-sm py-2"
+        <select
+          className="input w-auto text-sm py-2"
           value={filters.vestibular ?? ''}
-          onChange={(e) => e.target.value ? updateFilter('vestibular', e.target.value) : clearFilter('vestibular')}>
+          onChange={(e) => (e.target.value ? updateFilter('vestibular', e.target.value) : clearFilter('vestibular'))}
+        >
           <option value="">Todos os vestibulares</option>
-          {vestibulares.map((v) => <option key={v.id} value={v.slug}>{v.name}</option>)}
+          {vestibulares.map((v) => (
+            <option key={v.id} value={v.slug}>
+              {v.name}
+            </option>
+          ))}
         </select>
-        <select className="input w-auto text-sm py-2"
+        <select
+          className="input w-auto text-sm py-2"
           value={filters.ano ?? ''}
-          onChange={(e) => e.target.value ? updateFilter('ano', e.target.value) : clearFilter('ano')}>
+          onChange={(e) => (e.target.value ? updateFilter('ano', e.target.value) : clearFilter('ano'))}
+        >
           <option value="">Todos os anos</option>
           {Array.from({ length: 2024 - 2011 + 1 }, (_, i) => 2024 - i).map((y) => (
-            <option key={y} value={y}>{y}</option>
+            <option key={y} value={y}>
+              {y}
+            </option>
           ))}
         </select>
       </div>
@@ -216,15 +280,21 @@ export default function QuestoesClient({ questions, areas, vestibulares, userAns
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-4">
-          <button onClick={() => updateFilter('page', String(page - 1))} disabled={page <= 1}
-            className="btn-ghost p-2 disabled:opacity-30">
+          <button
+            onClick={() => updateFilter('page', String(page - 1))}
+            disabled={page <= 1}
+            className="btn-ghost p-2 disabled:opacity-30"
+          >
             <ChevronLeft size={16} />
           </button>
           <span className="text-sm text-[var(--text-secondary)] px-4">
             Página {page} de {totalPages}
           </span>
-          <button onClick={() => updateFilter('page', String(page + 1))} disabled={page >= totalPages}
-            className="btn-ghost p-2 disabled:opacity-30">
+          <button
+            onClick={() => updateFilter('page', String(page + 1))}
+            disabled={page >= totalPages}
+            className="btn-ghost p-2 disabled:opacity-30"
+          >
             <ChevronRight size={16} />
           </button>
         </div>

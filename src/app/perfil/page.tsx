@@ -13,18 +13,6 @@ interface AreaStat {
   corretas: number
 }
 
-interface AnswerRow {
-  correta: boolean
-  questions: {
-    areas: {
-      name: string
-      icon: string
-      color: string
-      slug: string
-    } | null
-  } | null
-}
-
 export default async function PerfilPage() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -51,21 +39,40 @@ export default async function PerfilPage() {
   const { data: statsRaw } = await supabase
     .from('user_stats').select('*').eq('user_id', user.id).single()
 
-  const { data: byArea } = await supabase
+  // Busca respostas com área — duas queries separadas para evitar problema de tipo
+  const { data: answers } = await supabase
     .from('user_answers')
-    .select('correta, questions!inner(areas!inner(name, icon, color, slug))')
+    .select('question_id, correta')
     .eq('user_id', user.id)
 
   const areaMap: Record<string, AreaStat> = {}
-  for (const row of (byArea ?? []) as AnswerRow[]) {
-    const area = row.questions?.areas
-    if (!area) continue
-    if (!areaMap[area.slug]) {
-      areaMap[area.slug] = { name: area.name, icon: area.icon, color: area.color, total: 0, corretas: 0 }
+
+  if (answers && answers.length > 0) {
+    const questionIds = answers.map((a) => a.question_id as string)
+    const { data: questionsWithArea } = await supabase
+      .from('questions')
+      .select('id, areas(name, icon, color, slug)')
+      .in('id', questionIds)
+
+    const areaByQuestion: Record<string, { name: string; icon: string; color: string; slug: string }> = {}
+    for (const q of questionsWithArea ?? []) {
+      const area = Array.isArray(q.areas) ? q.areas[0] : q.areas
+      if (area && typeof area === 'object' && 'slug' in area) {
+        areaByQuestion[q.id as string] = area as { name: string; icon: string; color: string; slug: string }
+      }
     }
-    areaMap[area.slug].total++
-    if (row.correta) areaMap[area.slug].corretas++
+
+    for (const ans of answers) {
+      const area = areaByQuestion[ans.question_id as string]
+      if (!area) continue
+      if (!areaMap[area.slug]) {
+        areaMap[area.slug] = { name: area.name, icon: area.icon, color: area.color, total: 0, corretas: 0 }
+      }
+      areaMap[area.slug].total++
+      if (ans.correta) areaMap[area.slug].corretas++
+    }
   }
+
   const areaStats = Object.values(areaMap).sort((a, b) => b.total - a.total)
   const stats = statsRaw ?? { total_respondidas: 0, total_corretas: 0, pct_acerto: 0, tempo_medio_seg: 0 }
 
@@ -78,8 +85,10 @@ export default async function PerfilPage() {
     <AppLayout profile={safeProfile}>
       <div className="space-y-6">
         <div className="card p-6 flex flex-col md:flex-row items-center gap-6">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-black text-white flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg, #5c5cff, #a855f7)', boxShadow: '0 0 32px rgba(92,92,255,0.4)' }}>
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-black text-white flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg, #5c5cff, #a855f7)', boxShadow: '0 0 32px rgba(92,92,255,0.4)' }}
+          >
             {userInitial}
           </div>
           <div className="text-center md:text-left">
@@ -93,10 +102,11 @@ export default async function PerfilPage() {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { icon: BookOpen,     label: 'Respondidas', value: stats.total_respondidas, color: '#5c5cff' },
-            { icon: CheckCircle,  label: 'Corretas',    value: stats.total_corretas,    color: '#22c55e' },
-            { icon: Zap,          label: '% Acerto',    value: `${stats.pct_acerto ?? 0}%`, color: '#a855f7' },
-            { icon: Clock,        label: 'Tempo médio', value: stats.tempo_medio_seg ? `${Math.round(stats.tempo_medio_seg)}s` : '—', color: '#fbbf24' },
+            { icon: BookOpen,    label: 'Respondidas', value: stats.total_respondidas,          color: '#5c5cff' },
+            { icon: CheckCircle, label: 'Corretas',    value: stats.total_corretas,             color: '#22c55e' },
+            { icon: Zap,         label: '% Acerto',    value: `${stats.pct_acerto ?? 0}%`,      color: '#a855f7' },
+            { icon: Clock,       label: 'Tempo médio', value: stats.tempo_medio_seg
+                ? `${Math.round(stats.tempo_medio_seg as number)}s` : '—',                       color: '#fbbf24' },
           ].map((s) => (
             <div key={s.label} className="card p-5">
               <div className="flex justify-between items-center mb-3">
@@ -125,13 +135,15 @@ export default async function PerfilPage() {
                         <span className="text-white font-medium">{a.name}</span>
                       </div>
                       <div className="text-xs text-[var(--text-muted)]">
-                        {a.corretas}/{a.total} ·{' '}
+                        {a.corretas}/{a.total}{' '}·{' '}
                         <span className="font-semibold" style={{ color: a.color }}>{pct}%</span>
                       </div>
                     </div>
                     <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                      <div className="h-full rounded-full transition-all duration-700"
-                        style={{ width: `${pct}%`, background: a.color }} />
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${pct}%`, background: a.color }}
+                      />
                     </div>
                   </div>
                 )

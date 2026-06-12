@@ -10,9 +10,24 @@ export default async function AdminPage() {
   if (!user) redirect('/auth/login')
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-  if (profile?.role !== 'admin') redirect('/questoes')
 
-  // Estatísticas gerais
+  let safeProfile = profile
+  if (!safeProfile) {
+    const { data: newProfile } = await supabase
+      .from('profiles')
+      .upsert({
+        id: user.id,
+        email: user.email!,
+        name: user.user_metadata?.name || user.email!.split('@')[0],
+        role: 'user',
+      })
+      .select()
+      .single()
+    safeProfile = newProfile
+  }
+
+  if (safeProfile?.role !== 'admin') redirect('/questoes')
+
   const [
     { count: totalQuestions },
     { count: totalUsers },
@@ -32,7 +47,7 @@ export default async function AdminPage() {
   ])
 
   return (
-    <AppLayout profile={profile}>
+    <AppLayout profile={safeProfile}>
       <AdminDashboard
         stats={{ totalQuestions, totalUsers, totalAnswers, totalExams }}
         areas={areas || []}

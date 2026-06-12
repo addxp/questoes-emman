@@ -4,21 +4,6 @@ import { redirect } from 'next/navigation'
 import AppLayout from '@/components/layout/AppLayout'
 import { BarChart2, CheckCircle, BookOpen, Clock, Zap } from 'lucide-react'
 
-type AreaInfo = {
-  name: string
-  icon: string
-  color: string
-  slug: string
-}
-
-type AnswerWithArea = {
-  correta: boolean
-  questions: {
-    area_id: string
-    areas: AreaInfo | AreaInfo[] | null
-  } | null
-}
-
 export default async function PerfilPage() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -26,54 +11,65 @@ export default async function PerfilPage() {
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
 
-  if (!profile) redirect('/auth/login')
+  let safeProfile = profile
+  if (!safeProfile) {
+    const { data: newProfile } = await supabase
+      .from('profiles')
+      .upsert({
+        id: user.id,
+        email: user.email!,
+        name: user.user_metadata?.name || user.email!.split('@')[0],
+        role: 'user',
+      })
+      .select()
+      .single()
+    safeProfile = newProfile
+  }
 
-  // Stats gerais
   const { data: statsRaw } = await supabase
     .from('user_stats')
     .select('*')
     .eq('user_id', user.id)
     .single()
 
-  // Desempenho por área
   const { data: byArea } = await supabase
     .from('user_answers')
     .select(`correta, questions!inner(area_id, areas!inner(name, icon, color, slug))`)
     .eq('user_id', user.id)
 
-  // Agrupa por área
   const areaMap: Record<string, { name: string; icon: string; color: string; total: number; corretas: number }> = {}
-  for (const ans of (byArea || []) as unknown as AnswerWithArea[]) {
-    const areaData = ans.questions?.areas
-    const area = Array.isArray(areaData) ? areaData[0] : areaData
+  for (const ans of byArea || []) {
+    const area = (ans.questions as any)?.areas
     if (!area) continue
     if (!areaMap[area.slug]) areaMap[area.slug] = { name: area.name, icon: area.icon, color: area.color, total: 0, corretas: 0 }
     areaMap[area.slug].total++
     if (ans.correta) areaMap[area.slug].corretas++
   }
   const areaStats = Object.values(areaMap).sort((a, b) => b.total - a.total)
-
   const stats = statsRaw || { total_respondidas: 0, total_corretas: 0, pct_acerto: 0, tempo_medio_seg: 0 }
 
+  const userName = safeProfile?.name || safeProfile?.email?.split('@')[0] || 'Estudante'
+  const userEmail = safeProfile?.email || user.email || ''
+  const userInitial = userName[0]?.toUpperCase() || 'U'
+  const createdAt = safeProfile?.created_at || user.created_at
+
   return (
-    <AppLayout profile={profile}>
+    <AppLayout profile={safeProfile}>
       <div className="space-y-6">
-        {/* Header */}
         <div className="card p-6 flex flex-col md:flex-row items-center gap-6">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-black text-white flex-shrink-0"
             style={{ background: 'linear-gradient(135deg, #5c5cff, #a855f7)', boxShadow: '0 0 32px rgba(92,92,255,0.4)' }}>
-            {(profile.name || profile.email)?.[0]?.toUpperCase()}
+            {userInitial}
           </div>
           <div className="text-center md:text-left">
-            <h1 className="text-2xl font-black text-white">{profile.name || 'Estudante'}</h1>
-            <p className="text-[var(--text-secondary)] text-sm">{profile.email}</p>
+            <h1 className="text-2xl font-black text-white">{userName}</h1>
+            <p className="text-[var(--text-secondary)] text-sm">{userEmail}</p>
             <p className="text-xs text-[var(--text-muted)] mt-1">
-              Membro desde {new Date(profile.created_at).toLocaleDateString('pt-BR')}
+              Membro desde {createdAt ? new Date(createdAt).toLocaleDateString('pt-BR') : '—'}
             </p>
           </div>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { icon: BookOpen, label: 'Respondidas', value: stats.total_respondidas, color: '#5c5cff' },
@@ -91,8 +87,7 @@ export default async function PerfilPage() {
           ))}
         </div>
 
-        {/* Por disciplina */}
-        {areaStats.length > 0 && (
+        {areaStats.length > 0 ? (
           <div className="card p-6">
             <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
               <BarChart2 size={18} className="text-[var(--text-muted)]" />
@@ -113,19 +108,15 @@ export default async function PerfilPage() {
                       </div>
                     </div>
                     <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                      <div
-                        className="h-full rounded-full transition-all duration-700"
-                        style={{ width: `${pct}%`, background: a.color }}
-                      />
+                      <div className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${pct}%`, background: a.color }} />
                     </div>
                   </div>
                 )
               })}
             </div>
           </div>
-        )}
-
-        {areaStats.length === 0 && (
+        ) : (
           <div className="card p-16 text-center">
             <div className="text-5xl mb-4">📊</div>
             <h3 className="text-white font-bold mb-2">Nenhuma questão respondida ainda</h3>

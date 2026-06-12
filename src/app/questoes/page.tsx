@@ -13,46 +13,64 @@ export default async function QuestoesPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
+  // Busca perfil — pode ser null se o trigger não rodou ainda
   const { data: profile } = await supabase
-    .from('profiles').select('*').eq('id', user.id).single()
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single()
 
-  // Busca filtros
+  // Se não tem perfil, cria um na hora
+  let safeProfile = profile
+  if (!safeProfile) {
+    const { data: newProfile } = await supabase
+      .from('profiles')
+      .upsert({
+        id: user.id,
+        email: user.email!,
+        name: user.user_metadata?.name || user.email!.split('@')[0],
+        role: 'user',
+      })
+      .select()
+      .single()
+    safeProfile = newProfile
+  }
+
   const { data: areas } = await supabase.from('areas').select('*').order('name')
   const { data: vestibulares } = await supabase.from('vestibulares').select('*').order('name')
 
-  // Query de questões com filtros
   let query = supabase
     .from('questions')
     .select(`*, areas(*), vestibulares(*)`, { count: 'exact' })
     .eq('ativo', true)
 
-  if (searchParams.area) query = query.eq('areas.slug', searchParams.area)
-  if (searchParams.vestibular) query = query.eq('vestibulares.slug', searchParams.vestibular)
-  if (searchParams.ano) query = query.eq('ano', parseInt(searchParams.ano))
-
   const page = parseInt(searchParams.page || '1')
   const pageSize = 10
-  query = query
+
+  if (searchParams.ano) query = query.eq('ano', parseInt(searchParams.ano))
+
+  const { data: questions, count } = await query
     .order('ano', { ascending: false })
     .range((page - 1) * pageSize, page * pageSize - 1)
 
-  const { data: questions, count } = await query
-
-  // Respostas do usuário (para marcar questões já respondidas)
   const questionIds = (questions || []).map(q => q.id)
-  const { data: userAnswers } = await supabase
-    .from('user_answers')
-    .select('question_id, resposta, correta')
-    .eq('user_id', user.id)
-    .in('question_id', questionIds)
+  let userAnswers: any[] = []
+  if (questionIds.length > 0) {
+    const { data } = await supabase
+      .from('user_answers')
+      .select('question_id, resposta, correta')
+      .eq('user_id', user.id)
+      .in('question_id', questionIds)
+    userAnswers = data || []
+  }
 
   return (
-    <AppLayout profile={profile}>
+    <AppLayout profile={safeProfile}>
       <QuestoesClient
         questions={questions || []}
         areas={areas || []}
         vestibulares={vestibulares || []}
-        userAnswers={userAnswers || []}
+        userAnswers={userAnswers}
         total={count || 0}
         page={page}
         pageSize={pageSize}

@@ -11,17 +11,25 @@ export default async function EnemDoEmmanPage() {
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
 
-  const today = new Date()
+  let safeProfile = profile
+  if (!safeProfile) {
+    const { data: newProfile } = await supabase
+      .from('profiles')
+      .upsert({
+        id: user.id,
+        email: user.email!,
+        name: user.user_metadata?.name || user.email!.split('@')[0],
+        role: 'user',
+      })
+      .select()
+      .single()
+    safeProfile = newProfile
+  }
 
+  const today = new Date()
   const { data: exam } = await supabase
     .from('weekly_exams')
-    .select(`
-      *,
-      weekly_exam_questions (
-        *,
-        questions (*, areas(*), vestibulares(*))
-      )
-    `)
+    .select(`*, weekly_exam_questions(*, questions(*, areas(*), vestibulares(*)))`)
     .eq('publicada', true)
     .gte('semana_fim', today.toISOString().split('T')[0])
     .lte('semana_inicio', today.toISOString().split('T')[0])
@@ -35,7 +43,7 @@ export default async function EnemDoEmmanPage() {
     .order('semana_inicio', { ascending: false })
     .limit(8)
 
-  let userAnswers: { question_id: string; resposta: string | null; correta: boolean | null }[] = []
+  let userAnswers: any[] = []
   if (exam) {
     const { data } = await supabase
       .from('user_answers')
@@ -46,7 +54,7 @@ export default async function EnemDoEmmanPage() {
   }
 
   return (
-    <AppLayout profile={profile}>
+    <AppLayout profile={safeProfile}>
       <EnemDoEmmanClient
         exam={exam || null}
         pastExams={pastExams || []}

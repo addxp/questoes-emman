@@ -4,12 +4,6 @@ import { redirect } from 'next/navigation'
 import AppLayout from '@/components/layout/AppLayout'
 import EnemDoEmmanClient from './EnemDoEmmanClient'
 
-type UserAnswer = {
-  question_id: string
-  resposta: string
-  correta: boolean
-}
-
 export default async function EnemDoEmmanPage() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -17,7 +11,6 @@ export default async function EnemDoEmmanPage() {
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
 
-  // Busca a prova da semana atual
   const today = new Date()
 
   const { data: exam } = await supabase
@@ -34,7 +27,6 @@ export default async function EnemDoEmmanPage() {
     .lte('semana_inicio', today.toISOString().split('T')[0])
     .single()
 
-  // Provas anteriores
   const { data: pastExams } = await supabase
     .from('weekly_exams')
     .select('id, titulo, semana_inicio, semana_fim')
@@ -43,12 +35,15 @@ export default async function EnemDoEmmanPage() {
     .order('semana_inicio', { ascending: false })
     .limit(8)
 
-  // Respostas do usuário nesta prova
-type UserAnswer = {
-  question_id: string
-  resposta: 'A' | 'B' | 'C' | 'D' | 'E'
-  correta: boolean
-}
+  let userAnswers: { question_id: string; resposta: string; correta: boolean }[] = []
+  if (exam) {
+    const { data } = await supabase
+      .from('user_answers')
+      .select('question_id, resposta, correta')
+      .eq('user_id', user.id)
+      .eq('exam_id', exam.id)
+    userAnswers = data || []
+  }
 
   return (
     <AppLayout profile={profile}>

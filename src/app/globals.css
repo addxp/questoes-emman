@@ -1,0 +1,219 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-inter: 'Inter', sans-serif;
+
+  /* Paleta escura premium */
+  --bg-base:      #06060f;
+  --bg-surface:   #0d0d1f;
+  --bg-elevated:  #13132a;
+  --bg-card:      #16163a;
+  --border:       rgba(255,255,255,0.07);
+  --border-brand: rgba(92,92,255,0.3);
+
+  --text-primary:   #f0f0ff;
+  --text-secondary: #9898c8;
+  --text-muted:     #5a5a8a;
+
+  --brand:   #5c5cff;
+  --brand-2: #a855f7;
+  --brand-3: #ec4899;
+  --gold:    #fbbf24;
+  --success: #22c55e;
+  --danger:  #ef4444;
+  --warning: #f59e0b;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-inter);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* Scrollbar premium */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-surface); }
+::-webkit-scrollbar-thumb { background: var(--border-brand); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--brand); }
+
+/* Selection */
+::selection { background: rgba(92,92,255,0.35); color: #fff; }
+
+/* Focus ring bonito */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@layer components {
+  .card {
+    @apply bg-[#13132a] border border-white/5 rounded-2xl;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .card-hover {
+    @apply card transition-all duration-300;
+  }
+  .card-hover:hover {
+    @apply border-[rgba(92,92,255,0.3)];
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(92,92,255,0.15), inset 0 1px 0 rgba(255,255,255,0.06);
+    transform: translateY(-2px);
+  }
+
+  .btn-primary {
+    @apply relative inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm text-white overflow-hidden transition-all duration-200;
+    background: linear-gradient(135deg, #5c5cff, #a855f7);
+  }
+  .btn-primary::before {
+    content: '';
+    @apply absolute inset-0 opacity-0 transition-opacity duration-200;
+    background: linear-gradient(135deg, #7c7cff, #c07af7);
+  }
+  .btn-primary:hover::before { @apply opacity-100; }
+  .btn-primary:active { transform: scale(0.98); }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-[var(--text-secondary)] transition-all duration-200;
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover {
+    @apply text-white;
+    border-color: rgba(92,92,255,0.3);
+    background: rgba(92,92,255,0.08);
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+
+  .input {
+    @apply w-full px-4 py-3 rounded-xl text-sm text-white placeholder-[var(--text-muted)] transition-all duration-200;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px rgba(92,92,255,0.15);
+  }
+
+  .glass {
+    backdrop-filter: blur(20px) saturate(180%);
+    background: rgba(13,13,31,0.8);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  /* Gradient text */
+  .text-gradient {
+    background: linear-gradient(135deg, #5c5cff, #a855f7, #ec4899);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Alternativa de questão */
+  .alt-option {
+    @apply flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200;
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+  }
+  .alt-option:hover {
+    border-color: rgba(92,92,255,0.4);
+    background: rgba(92,92,255,0.06);
+  }
+  .alt-option.selected {
+    border-color: var(--brand);
+    background: rgba(92,92,255,0.12);
+  }
+  .alt-option.correct {
+    border-color: var(--success);
+    background: rgba(34,197,94,0.1);
+  }
+  .alt-option.wrong {
+    border-color: var(--danger);
+    background: rgba(239,68,68,0.08);
+  }
+
+  /* Separador com glow */
+  .divider {
+    @apply relative flex items-center my-6;
+  }
+  .divider::before, .divider::after {
+    content: '';
+    @apply flex-1 h-px;
+    background: var(--border);
+  }
+  .divider span {
+    @apply px-4 text-xs text-[var(--text-muted)];
+  }
+
+  /* Sidebar link ativo */
+  .nav-link {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-[var(--text-secondary)] transition-all duration-200 cursor-pointer;
+  }
+  .nav-link:hover {
+    @apply text-white;
+    background: rgba(92,92,255,0.08);
+  }
+  .nav-link.active {
+    @apply text-white;
+    background: rgba(92,92,255,0.15);
+    border: 1px solid rgba(92,92,255,0.25);
+  }
+
+  /* Orbit decorativo */
+  .orbit-ring {
+    @apply absolute rounded-full pointer-events-none;
+    border: 1px solid rgba(92,92,255,0.12);
+    animation: spin 20s linear infinite;
+  }
+
+  /* Noise texture overlay */
+  .noise::after {
+    content: '';
+    @apply absolute inset-0 pointer-events-none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    opacity: 0.4;
+  }
+}
+
+/* Animação de entrada staggered */
+.stagger-in > * {
+  animation: slideUp 0.4s ease-out both;
+}
+.stagger-in > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-in > *:nth-child(2) { animation-delay: 60ms; }
+.stagger-in > *:nth-child(3) { animation-delay: 120ms; }
+.stagger-in > *:nth-child(4) { animation-delay: 180ms; }
+.stagger-in > *:nth-child(5) { animation-delay: 240ms; }
+.stagger-in > *:nth-child(6) { animation-delay: 300ms; }
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes float {
+  0%,100% { transform: translateY(0px); }
+  50%      { transform: translateY(-8px); }
+}

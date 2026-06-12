@@ -126,6 +126,7 @@ export default function EnemDoEmmanClient({ exam, pastExams, userAnswers, userId
   const progresso = totalCaderno > 0 ? Math.round(respondidas / totalCaderno * 100) : 0
 
   async function handleAnswer(questionId: string, resposta: string, gabarito: string) {
+    if (!exam) return
     const correta = resposta === gabarito
     setAnswers(prev => ({ ...prev, [questionId]: { resposta, correta } }))
     setRevealed(prev => ({ ...prev, [questionId]: true }))

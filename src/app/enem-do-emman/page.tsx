@@ -44,15 +44,11 @@ export default async function EnemDoEmmanPage() {
     .limit(8)
 
   // Respostas do usuário nesta prova
-  let userAnswers: UserAnswer[] = []
-  if (exam) {
-    const { data } = await supabase
-      .from('user_answers')
-      .select('question_id, resposta, correta')
-      .eq('user_id', user.id)
-      .eq('exam_id', exam.id)
-    userAnswers = data || []
-  }
+type UserAnswer = {
+  question_id: string
+  resposta: 'A' | 'B' | 'C' | 'D' | 'E'
+  correta: boolean
+}
 
   return (
     <AppLayout profile={profile}>

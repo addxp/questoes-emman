@@ -59,7 +59,7 @@ interface PastExam {
 interface Props {
   exam: Exam | null
   pastExams: PastExam[]
-  userAnswers: Partial<UserAnswer>[]
+  userAnswers: UserAnswer[]
   userId: string
 }
 
@@ -67,10 +67,10 @@ export default function EnemDoEmmanClient({ exam, pastExams, userAnswers, userId
   const supabase = createClient()
   const [caderno, setCaderno] = useState<'humanas' | 'exatas'>('humanas')
   const [answers, setAnswers] = useState<Record<string, { resposta: string; correta: boolean }>>(
-    Object.fromEntries(userAnswers.map(a => [a.question_id!, { resposta: a.resposta!, correta: a.correta! }]))
+    Object.fromEntries(userAnswers.map(a => [a.question_id, { resposta: a.resposta, correta: a.correta }]))
   )
   const [revealed, setRevealed] = useState<Record<string, boolean>>(
-    Object.fromEntries(userAnswers.map(a => [a.question_id!, true]))
+    Object.fromEntries(userAnswers.map(a => [a.question_id, true]))
   )
 
   if (!exam) {

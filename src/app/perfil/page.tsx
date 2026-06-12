@@ -26,6 +26,8 @@ export default async function PerfilPage() {
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
 
+  if (!profile) redirect('/auth/login')
+
   // Stats gerais
   const { data: statsRaw } = await supabase
     .from('user_stats')

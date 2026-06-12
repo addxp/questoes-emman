@@ -5,10 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/types'
-import {
-  BookOpen, Trophy, BarChart2, LogOut,
-  Menu, Shield, Zap
-} from 'lucide-react'
+import { BookOpen, Trophy, BarChart2, LogOut, Menu, Shield } from 'lucide-react'
 
 interface Props {
   profile: Profile | null
@@ -33,7 +30,6 @@ export default function AppLayout({ profile, children }: Props) {
     router.refresh()
   }
 
-  // Valores seguros mesmo se profile for null
   const userName = profile?.name || profile?.email?.split('@')[0] || 'Estudante'
   const userEmail = profile?.email || ''
   const userRole = profile?.role || 'user'
@@ -41,7 +37,6 @@ export default function AppLayout({ profile, children }: Props) {
 
   const Sidebar = () => (
     <aside className="flex flex-col h-full">
-      {/* Logo */}
       <div className="p-6 border-b border-white/5">
         <Link href="/" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg"
@@ -55,33 +50,24 @@ export default function AppLayout({ profile, children }: Props) {
         </Link>
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 p-4 space-y-1">
         {NAV.map(({ href, icon: Icon, label }) => (
-          <Link
-            key={href}
-            href={href}
-            onClick={() => setOpen(false)}
-            className={`nav-link ${pathname.startsWith(href) ? 'active' : ''}`}
-          >
+          <Link key={href} href={href} onClick={() => setOpen(false)}
+            className={`nav-link ${pathname.startsWith(href) ? 'active' : ''}`}>
             <Icon size={16} />
             {label}
           </Link>
         ))}
         {userRole === 'admin' && (
-          <Link
-            href="/admin"
-            onClick={() => setOpen(false)}
+          <Link href="/admin" onClick={() => setOpen(false)}
             className={`nav-link ${pathname.startsWith('/admin') ? 'active' : ''}`}
-            style={{ color: '#fbbf24' }}
-          >
+            style={{ color: '#fbbf24' }}>
             <Shield size={16} />
             Painel Admin
           </Link>
         )}
       </nav>
 
-      {/* User */}
       <div className="p-4 border-t border-white/5">
         <div className="flex items-center gap-3 px-3 py-2 rounded-xl mb-2"
           style={{ background: 'rgba(255,255,255,0.03)' }}>
@@ -110,17 +96,14 @@ export default function AppLayout({ profile, children }: Props) {
 
   return (
     <div className="min-h-screen bg-[#06060f] flex">
-      {/* Sidebar desktop */}
       <div className="hidden lg:flex flex-col fixed inset-y-0 left-0 z-40 w-64 border-r border-white/5"
         style={{ background: 'var(--bg-surface)' }}>
         <Sidebar />
       </div>
 
-      {/* Mobile overlay */}
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setOpen(false)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)} />
           <div className="absolute left-0 inset-y-0 w-72 border-r border-white/5"
             style={{ background: 'var(--bg-surface)' }}>
             <Sidebar />
@@ -128,9 +111,7 @@ export default function AppLayout({ profile, children }: Props) {
         </div>
       )}
 
-      {/* Main */}
       <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
-        {/* Mobile topbar */}
         <div className="lg:hidden flex items-center justify-between px-4 h-14 border-b border-white/5 glass sticky top-0 z-30">
           <button onClick={() => setOpen(true)} className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-white">
             <Menu size={20} />
@@ -141,7 +122,6 @@ export default function AppLayout({ profile, children }: Props) {
           </div>
           <div className="w-9" />
         </div>
-
         <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
           {children}
         </main>

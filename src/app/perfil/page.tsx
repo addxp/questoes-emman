@@ -3,22 +3,44 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import AppLayout from '@/components/layout/AppLayout'
 import { BarChart2, CheckCircle, BookOpen, Clock, Zap } from 'lucide-react'
+import type { Profile } from '@/types'
+
+interface AreaStat {
+  name: string
+  icon: string
+  color: string
+  total: number
+  corretas: number
+}
+
+interface AnswerRow {
+  correta: boolean
+  questions: {
+    areas: {
+      name: string
+      icon: string
+      color: string
+      slug: string
+    } | null
+  } | null
+}
 
 export default async function PerfilPage() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+  const { data: profile } = await supabase
+    .from('profiles').select('*').eq('id', user.id).single()
 
-  let safeProfile = profile
+  let safeProfile: Profile | null = profile
   if (!safeProfile) {
     const { data: newProfile } = await supabase
       .from('profiles')
       .upsert({
         id: user.id,
         email: user.email!,
-        name: user.user_metadata?.name || user.email!.split('@')[0],
+        name: user.user_metadata?.name ?? user.email!.split('@')[0],
         role: 'user',
       })
       .select()
@@ -27,31 +49,30 @@ export default async function PerfilPage() {
   }
 
   const { data: statsRaw } = await supabase
-    .from('user_stats')
-    .select('*')
-    .eq('user_id', user.id)
-    .single()
+    .from('user_stats').select('*').eq('user_id', user.id).single()
 
   const { data: byArea } = await supabase
     .from('user_answers')
-    .select(`correta, questions!inner(area_id, areas!inner(name, icon, color, slug))`)
+    .select('correta, questions!inner(areas!inner(name, icon, color, slug))')
     .eq('user_id', user.id)
 
-  const areaMap: Record<string, { name: string; icon: string; color: string; total: number; corretas: number }> = {}
-  for (const ans of byArea || []) {
-    const area = (ans.questions as any)?.areas
+  const areaMap: Record<string, AreaStat> = {}
+  for (const row of (byArea ?? []) as AnswerRow[]) {
+    const area = row.questions?.areas
     if (!area) continue
-    if (!areaMap[area.slug]) areaMap[area.slug] = { name: area.name, icon: area.icon, color: area.color, total: 0, corretas: 0 }
+    if (!areaMap[area.slug]) {
+      areaMap[area.slug] = { name: area.name, icon: area.icon, color: area.color, total: 0, corretas: 0 }
+    }
     areaMap[area.slug].total++
-    if (ans.correta) areaMap[area.slug].corretas++
+    if (row.correta) areaMap[area.slug].corretas++
   }
   const areaStats = Object.values(areaMap).sort((a, b) => b.total - a.total)
-  const stats = statsRaw || { total_respondidas: 0, total_corretas: 0, pct_acerto: 0, tempo_medio_seg: 0 }
+  const stats = statsRaw ?? { total_respondidas: 0, total_corretas: 0, pct_acerto: 0, tempo_medio_seg: 0 }
 
-  const userName = safeProfile?.name || safeProfile?.email?.split('@')[0] || 'Estudante'
-  const userEmail = safeProfile?.email || user.email || ''
-  const userInitial = userName[0]?.toUpperCase() || 'U'
-  const createdAt = safeProfile?.created_at || user.created_at
+  const userName = safeProfile?.name ?? safeProfile?.email?.split('@')[0] ?? 'Estudante'
+  const userEmail = safeProfile?.email ?? user.email ?? ''
+  const userInitial = userName[0]?.toUpperCase() ?? 'U'
+  const createdAt = safeProfile?.created_at ?? user.created_at
 
   return (
     <AppLayout profile={safeProfile}>
@@ -72,17 +93,17 @@ export default async function PerfilPage() {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { icon: BookOpen, label: 'Respondidas', value: stats.total_respondidas, color: '#5c5cff' },
-            { icon: CheckCircle, label: 'Corretas', value: stats.total_corretas, color: '#22c55e' },
-            { icon: Zap, label: '% Acerto', value: `${stats.pct_acerto || 0}%`, color: '#a855f7' },
-            { icon: Clock, label: 'Tempo médio', value: stats.tempo_medio_seg ? `${Math.round(stats.tempo_medio_seg)}s` : '—', color: '#fbbf24' },
-          ].map(s => (
+            { icon: BookOpen,     label: 'Respondidas', value: stats.total_respondidas, color: '#5c5cff' },
+            { icon: CheckCircle,  label: 'Corretas',    value: stats.total_corretas,    color: '#22c55e' },
+            { icon: Zap,          label: '% Acerto',    value: `${stats.pct_acerto ?? 0}%`, color: '#a855f7' },
+            { icon: Clock,        label: 'Tempo médio', value: stats.tempo_medio_seg ? `${Math.round(stats.tempo_medio_seg)}s` : '—', color: '#fbbf24' },
+          ].map((s) => (
             <div key={s.label} className="card p-5">
               <div className="flex justify-between items-center mb-3">
                 <s.icon size={18} style={{ color: s.color }} />
                 <span className="text-xs text-[var(--text-muted)]">{s.label}</span>
               </div>
-              <div className="text-2xl font-black text-white">{s.value || 0}</div>
+              <div className="text-2xl font-black text-white">{s.value ?? 0}</div>
             </div>
           ))}
         </div>
@@ -94,8 +115,8 @@ export default async function PerfilPage() {
               Desempenho por Disciplina
             </h2>
             <div className="space-y-4">
-              {areaStats.map(a => {
-                const pct = a.total > 0 ? Math.round(a.corretas / a.total * 100) : 0
+              {areaStats.map((a) => {
+                const pct = a.total > 0 ? Math.round((a.corretas / a.total) * 100) : 0
                 return (
                   <div key={a.name}>
                     <div className="flex items-center justify-between mb-1.5">
@@ -104,7 +125,8 @@ export default async function PerfilPage() {
                         <span className="text-white font-medium">{a.name}</span>
                       </div>
                       <div className="text-xs text-[var(--text-muted)]">
-                        {a.corretas}/{a.total} · <span className="font-semibold" style={{ color: a.color }}>{pct}%</span>
+                        {a.corretas}/{a.total} ·{' '}
+                        <span className="font-semibold" style={{ color: a.color }}>{pct}%</span>
                       </div>
                     </div>
                     <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>

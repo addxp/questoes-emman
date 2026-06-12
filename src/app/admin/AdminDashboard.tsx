@@ -35,9 +35,9 @@ const EMPTY_FORM = {
   numero: '',
   enunciado: '',
   contexto: '',
-  gabarito: 'A' as const,
+  gabarito: 'A' as 'A' | 'B' | 'C' | 'D' | 'E',
   explicacao: '',
-  dificuldade: 'medio' as const,
+  dificuldade: 'medio' as 'facil' | 'medio' | 'dificil',
   alt_a: '', alt_b: '', alt_c: '', alt_d: '', alt_e: '',
 }
 

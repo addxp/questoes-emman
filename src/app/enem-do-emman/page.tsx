@@ -35,7 +35,7 @@ export default async function EnemDoEmmanPage() {
     .order('semana_inicio', { ascending: false })
     .limit(8)
 
-  let userAnswers: { question_id: string; resposta: string; correta: boolean }[] = []
+  let userAnswers: { question_id: string; resposta: string | null; correta: boolean | null }[] = []
   if (exam) {
     const { data } = await supabase
       .from('user_answers')

@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Trophy, CheckCircle, XCircle, BookOpen, Calendar } from 'lucide-react'
-import type { UserAnswer } from '@/types'
 
 interface Alternativa {
   letra: string
@@ -56,17 +55,23 @@ interface PastExam {
   semana_fim: string
 }
 
+interface UserAnswerPartial {
+  question_id: string
+  resposta: string | null
+  correta: boolean | null
+}
+
 interface Props {
   exam: Exam | null
   pastExams: PastExam[]
-  userAnswers: UserAnswer[]
+  userAnswers: UserAnswerPartial[]
   userId: string
 }
 
 export default function EnemDoEmmanClient({ exam, pastExams, userAnswers, userId }: Props) {
   const supabase = createClient()
   const [caderno, setCaderno] = useState<'humanas' | 'exatas'>('humanas')
-  const [answers, setAnswers] = useState<Record<string, { resposta: string; correta: boolean }>>(
+  const [answers, setAnswers] = useState<Record<string, { resposta: string | null; correta: boolean | null }>>(
     Object.fromEntries(userAnswers.map(a => [a.question_id, { resposta: a.resposta, correta: a.correta }]))
   )
   const [revealed, setRevealed] = useState<Record<string, boolean>>(

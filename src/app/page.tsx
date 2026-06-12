@@ -1,7 +1,7 @@
 'use client'
 // src/app/page.tsx
 import Link from 'next/link'
-import { ArrowRight, Zap, Trophy, BookOpen, Target, Star, ChevronRight } from 'lucide-react'
+import { ArrowRight, Zap, Trophy, BookOpen, Target, Star } from 'lucide-react'
 
 const STATS = [
   { value: '5.000+', label: 'Questões cadastradas' },

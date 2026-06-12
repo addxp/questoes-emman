@@ -3,7 +3,16 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Area, Vestibular } from '@/types'
-import { Plus, Users, BookOpen, Trophy, BarChart2, Loader2, Check, Zap, Trash2 } from 'lucide-react'
+import { Plus, Users, BookOpen, Trophy, BarChart2, Loader2, Check, Zap } from 'lucide-react'
+
+interface RecentQuestion {
+  id: string
+  enunciado: string
+  ano: number
+  dificuldade: string
+  areas?: { name: string; icon: string; color: string }
+  vestibulares?: { name: string }
+}
 
 interface Stats {
   totalQuestions: number | null
@@ -16,7 +25,7 @@ interface Props {
   stats: Stats
   areas: Area[]
   vestibulares: Vestibular[]
-  recentQuestions: any[]
+  recentQuestions: RecentQuestion[]
 }
 
 const EMPTY_FORM = {
@@ -32,6 +41,8 @@ const EMPTY_FORM = {
   alt_a: '', alt_b: '', alt_c: '', alt_d: '', alt_e: '',
 }
 
+type FormKey = keyof typeof EMPTY_FORM
+
 export default function AdminDashboard({ stats, areas, vestibulares, recentQuestions }: Props) {
   const supabase = createClient()
   const [tab, setTab] = useState<'dashboard' | 'add-question' | 'generate-exam'>('dashboard')
@@ -40,7 +51,7 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
 
-  function update(key: string, value: any) {
+  function update(key: FormKey, value: string | number) {
     setForm(prev => ({ ...prev, [key]: value }))
   }
 
@@ -153,7 +164,7 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
               <p className="text-[var(--text-secondary)] text-sm">Nenhuma questão ainda.</p>
             ) : (
               <div className="space-y-3">
-                {recentQuestions.map((q: any) => (
+                {recentQuestions.map((q) => (
                   <div key={q.id} className="flex items-center gap-3 p-3 rounded-xl"
                     style={{ background: 'rgba(255,255,255,0.03)' }}>
                     <span style={{ color: q.areas?.color }} className="text-lg flex-shrink-0">{q.areas?.icon}</span>
@@ -246,36 +257,39 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
               <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
                 Alternativas *
               </label>
-              {(['A','B','C','D','E'] as const).map(l => (
-                <div key={l} className="flex items-center gap-3">
-                  <div className={`w-8 h-8 flex-shrink-0 rounded-lg flex items-center justify-center text-xs font-bold transition-all ${
-                    form.gabarito === l ? 'text-white' : 'text-[var(--text-muted)]'
-                  }`}
-                    style={form.gabarito === l ? {
-                      background: 'linear-gradient(135deg, #5c5cff, #a855f7)'
-                    } : { background: 'rgba(255,255,255,0.06)' }}>
-                    {l}
-                  </div>
-                  <input
-                    type="text"
-                    className="input flex-1"
-                    placeholder={`Alternativa ${l}`}
-                    value={(form as any)[`alt_${l.toLowerCase()}`]}
-                    onChange={e => update(`alt_${l.toLowerCase()}`, e.target.value)}
-                    required
-                  />
-                  <button type="button"
-                    onClick={() => update('gabarito', l)}
-                    className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                      form.gabarito === l
-                        ? 'text-[#86efac]'
-                        : 'text-[var(--text-muted)] hover:text-[#86efac]'
+              {(['A','B','C','D','E'] as const).map(l => {
+                const altKey = `alt_${l.toLowerCase()}` as FormKey
+                return (
+                  <div key={l} className="flex items-center gap-3">
+                    <div className={`w-8 h-8 flex-shrink-0 rounded-lg flex items-center justify-center text-xs font-bold transition-all ${
+                      form.gabarito === l ? 'text-white' : 'text-[var(--text-muted)]'
                     }`}
-                    style={{ background: form.gabarito === l ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.04)' }}>
-                    {form.gabarito === l ? <Check size={14} /> : 'Gabarito'}
-                  </button>
-                </div>
-              ))}
+                      style={form.gabarito === l ? {
+                        background: 'linear-gradient(135deg, #5c5cff, #a855f7)'
+                      } : { background: 'rgba(255,255,255,0.06)' }}>
+                      {l}
+                    </div>
+                    <input
+                      type="text"
+                      className="input flex-1"
+                      placeholder={`Alternativa ${l}`}
+                      value={form[altKey] as string}
+                      onChange={e => update(altKey, e.target.value)}
+                      required
+                    />
+                    <button type="button"
+                      onClick={() => update('gabarito', l)}
+                      className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                        form.gabarito === l
+                          ? 'text-[#86efac]'
+                          : 'text-[var(--text-muted)] hover:text-[#86efac]'
+                      }`}
+                      style={{ background: form.gabarito === l ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.04)' }}>
+                      {form.gabarito === l ? <Check size={14} /> : 'Gabarito'}
+                    </button>
+                  </div>
+                )
+              })}
             </div>
 
             <div>

@@ -2,12 +2,63 @@
 // src/app/enem-do-emman/EnemDoEmmanClient.tsx
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Trophy, Clock, CheckCircle, XCircle, BookOpen, BarChart2, Calendar } from 'lucide-react'
-import type { WeeklyExam, UserAnswer } from '@/types'
+import { Trophy, CheckCircle, XCircle, BookOpen, Calendar } from 'lucide-react'
+import type { UserAnswer } from '@/types'
+
+interface Alternativa {
+  letra: string
+  texto: string
+  correta: boolean
+}
+
+interface Area {
+  name: string
+  icon: string
+  color: string
+}
+
+interface Vestibular {
+  name: string
+}
+
+interface Question {
+  id: string
+  enunciado: string
+  contexto?: string
+  gabarito: string
+  ano: number
+  explicacao?: string
+  alternativas: Alternativa[]
+  areas?: Area
+  vestibulares?: Vestibular
+}
+
+interface WeeklyExamQuestion {
+  id: string
+  caderno: 'humanas' | 'exatas'
+  ordem: number
+  question_id: string
+  questions: Question
+}
+
+interface Exam {
+  id: string
+  titulo: string
+  semana_inicio: string
+  semana_fim: string
+  weekly_exam_questions: WeeklyExamQuestion[]
+}
+
+interface PastExam {
+  id: string
+  titulo: string
+  semana_inicio: string
+  semana_fim: string
+}
 
 interface Props {
-  exam: any
-  pastExams: any[]
+  exam: Exam | null
+  pastExams: PastExam[]
   userAnswers: Partial<UserAnswer>[]
   userId: string
 }
@@ -66,12 +117,12 @@ export default function EnemDoEmmanClient({ exam, pastExams, userAnswers, userId
   }
 
   const questoesCaderno = (exam.weekly_exam_questions || [])
-    .filter((wq: any) => wq.caderno === caderno)
-    .sort((a: any, b: any) => a.ordem - b.ordem)
+    .filter(wq => wq.caderno === caderno)
+    .sort((a, b) => a.ordem - b.ordem)
 
   const totalCaderno = questoesCaderno.length
-  const respondidas = questoesCaderno.filter((wq: any) => answers[wq.question_id]).length
-  const corretas = questoesCaderno.filter((wq: any) => answers[wq.question_id]?.correta).length
+  const respondidas = questoesCaderno.filter(wq => answers[wq.question_id]).length
+  const corretas = questoesCaderno.filter(wq => answers[wq.question_id]?.correta).length
   const progresso = totalCaderno > 0 ? Math.round(respondidas / totalCaderno * 100) : 0
 
   async function handleAnswer(questionId: string, resposta: string, gabarito: string) {
@@ -160,7 +211,7 @@ export default function EnemDoEmmanClient({ exam, pastExams, userAnswers, userId
 
       {/* Questões */}
       <div className="space-y-6 stagger-in">
-        {questoesCaderno.map((wq: any, idx: number) => {
+        {questoesCaderno.map((wq, idx) => {
           const q = wq.questions
           const ans = answers[q.id]
           const isRevealed = revealed[q.id]
@@ -199,7 +250,7 @@ export default function EnemDoEmmanClient({ exam, pastExams, userAnswers, userId
               <p className="text-white leading-relaxed mb-6">{q.enunciado}</p>
 
               <div className="space-y-2">
-                {q.alternativas?.map((alt: any) => {
+                {q.alternativas?.map((alt) => {
                   let cls = ''
                   if (isRevealed) {
                     if (alt.letra === q.gabarito) cls = 'correct'

@@ -4,6 +4,21 @@ import { redirect } from 'next/navigation'
 import AppLayout from '@/components/layout/AppLayout'
 import { BarChart2, CheckCircle, BookOpen, Clock, Zap } from 'lucide-react'
 
+type AreaInfo = {
+  name: string
+  icon: string
+  color: string
+  slug: string
+}
+
+type AnswerWithArea = {
+  correta: boolean
+  questions: {
+    area_id: string
+    areas: AreaInfo | AreaInfo[] | null
+  } | null
+}
+
 export default async function PerfilPage() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -26,8 +41,9 @@ export default async function PerfilPage() {
 
   // Agrupa por área
   const areaMap: Record<string, { name: string; icon: string; color: string; total: number; corretas: number }> = {}
-  for (const ans of byArea || []) {
-    const area = (ans.questions as any)?.areas
+  for (const ans of (byArea || []) as unknown as AnswerWithArea[]) {
+    const areaData = ans.questions?.areas
+    const area = Array.isArray(areaData) ? areaData[0] : areaData
     if (!area) continue
     if (!areaMap[area.slug]) areaMap[area.slug] = { name: area.name, icon: area.icon, color: area.color, total: 0, corretas: 0 }
     areaMap[area.slug].total++

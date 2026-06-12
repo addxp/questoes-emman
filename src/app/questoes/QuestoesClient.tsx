@@ -1,10 +1,10 @@
 'use client'
 // src/app/questoes/QuestoesClient.tsx
-import { useState, useTransition } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Question, Area, Vestibular, UserAnswer } from '@/types'
-import { Filter, ChevronLeft, ChevronRight, CheckCircle, XCircle, BookOpen, Clock } from 'lucide-react'
+import { Filter, ChevronLeft, ChevronRight, CheckCircle, XCircle, BookOpen } from 'lucide-react'
 
 interface Props {
   questions: Question[]
@@ -15,6 +15,16 @@ interface Props {
   page: number
   pageSize: number
   filters: Record<string, string | undefined>
+}
+
+type AreaRelation = {
+  name: string
+  icon: string
+  color: string
+}
+
+type VestibularRelation = {
+  name: string
 }
 
 function QuestionCard({
@@ -28,9 +38,6 @@ function QuestionCard({
 }) {
   const [selected, setSelected] = useState<string | null>(userAnswer?.resposta || null)
   const [revealed, setRevealed] = useState(!!userAnswer?.resposta)
-  const [startTime] = useState(Date.now())
-
-  const letras = ['A', 'B', 'C', 'D', 'E'] as const
 
   function handleAnswer(letra: string) {
     if (revealed) return
@@ -46,17 +53,20 @@ function QuestionCard({
     return ''
   }
 
+  const area = question.areas as unknown as AreaRelation | null
+  const vestibular = question.vestibulares as unknown as VestibularRelation | null
+
   return (
     <div className="card p-6 md:p-8 animate-[fadeIn_0.3s_ease-out]">
       {/* Header da questão */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <span className="badge"
-          style={{ background: (question.areas as any)?.color + '22', color: (question.areas as any)?.color, border: `1px solid ${(question.areas as any)?.color}44` }}>
-          {(question.areas as any)?.icon} {(question.areas as any)?.name}
+          style={{ background: area?.color + '22', color: area?.color, border: `1px solid ${area?.color}44` }}>
+          {area?.icon} {area?.name}
         </span>
         <span className="badge"
           style={{ background: 'rgba(92,92,255,0.12)', color: '#a3a3ff', border: '1px solid rgba(92,92,255,0.2)' }}>
-          {(question.vestibulares as any)?.name} {question.ano}
+          {vestibular?.name} {question.ano}
         </span>
         {question.numero && (
           <span className="badge"

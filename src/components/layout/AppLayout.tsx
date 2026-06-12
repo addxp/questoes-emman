@@ -6,8 +6,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/types'
 import {
-  BookOpen, Trophy, BarChart2, User, LogOut,
-  Menu, X, Zap, Shield, Home, ChevronRight
+  BookOpen, Trophy, BarChart2, LogOut,
+  Menu, Shield
 } from 'lucide-react'
 
 interface Props {

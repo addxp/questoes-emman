@@ -4,6 +4,12 @@ import { redirect } from 'next/navigation'
 import AppLayout from '@/components/layout/AppLayout'
 import EnemDoEmmanClient from './EnemDoEmmanClient'
 
+type UserAnswer = {
+  question_id: string
+  resposta: string
+  correta: boolean
+}
+
 export default async function EnemDoEmmanPage() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -13,9 +19,6 @@ export default async function EnemDoEmmanPage() {
 
   // Busca a prova da semana atual
   const today = new Date()
-  const monday = new Date(today)
-  monday.setDate(today.getDate() - today.getDay() + 1)
-  const mondayStr = monday.toISOString().split('T')[0]
 
   const { data: exam } = await supabase
     .from('weekly_exams')
@@ -41,7 +44,7 @@ export default async function EnemDoEmmanPage() {
     .limit(8)
 
   // Respostas do usuário nesta prova
-  let userAnswers: any[] = []
+  let userAnswers: UserAnswer[] = []
   if (exam) {
     const { data } = await supabase
       .from('user_answers')

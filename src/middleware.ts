@@ -22,31 +22,30 @@ export async function middleware(request: NextRequest) {
     }
   )
 
+  // IMPORTANTE: sempre chama getUser() para renovar o token
   const { data: { user } } = await supabase.auth.getUser()
+
   const pathname = request.nextUrl.pathname
-
-  // Rotas protegidas — requer login
-  const protectedPaths = ['/questoes', '/enem-do-emman', '/perfil']
-  const adminPaths = ['/admin']
-
+  const protectedPaths = ['/questoes', '/enem-do-emman', '/perfil', '/admin']
   const isProtected = protectedPaths.some(p => pathname.startsWith(p))
-  const isAdmin     = adminPaths.some(p => pathname.startsWith(p))
 
-  if ((isProtected || isAdmin) && !user) {
+  // Redireciona para login se não autenticado
+  if (isProtected && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
     url.searchParams.set('redirectTo', pathname)
-    return NextResponse.redirect(url)
+    const redirectResponse = NextResponse.redirect(url)
+    // Copia os cookies de supabase para o redirect também
+    supabaseResponse.cookies.getAll().forEach(cookie => {
+      redirectResponse.cookies.set(cookie.name, cookie.value)
+    })
+    return redirectResponse
   }
 
-  if (isAdmin && user) {
-    // Verifica role na tabela profiles
+  // Verifica admin
+  if (pathname.startsWith('/admin') && user) {
     const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
+      .from('profiles').select('role').eq('id', user.id).single()
     if (profile?.role !== 'admin') {
       return NextResponse.redirect(new URL('/questoes', request.url))
     }
@@ -56,5 +55,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/auth).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 }

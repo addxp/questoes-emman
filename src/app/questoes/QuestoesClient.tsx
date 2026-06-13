@@ -4,7 +4,11 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Question, Area, Vestibular } from '@/types'
-import { ChevronLeft, ChevronRight, CheckCircle, XCircle, BookOpen, ImageOff, SlidersHorizontal, X } from 'lucide-react'
+import {
+  ChevronLeft, ChevronRight, CheckCircle, XCircle,
+  BookOpen, ImageOff, SlidersHorizontal, X,
+  ArrowLeft, ArrowRight, SkipForward, RotateCcw
+} from 'lucide-react'
 
 interface UserAnswerRow {
   question_id: string
@@ -23,14 +27,13 @@ interface Props {
   filters: Record<string, string | undefined>
 }
 
-function extrairImagensDoTexto(texto: string | null | undefined): { textoLimpo: string; urls: string[] } {
+function extrairImagens(texto: string | null | undefined): { textoLimpo: string; urls: string[] } {
   if (!texto) return { textoLimpo: '', urls: [] }
   const urls: string[] = []
-  const regexMarkdown = /!\[.*?\]\((https?:\/\/[^\s)]+)\)/g
+  const regexMd = /!\[.*?\]\((https?:\/\/[^\s)]+)\)/g
   const regexUrl = /(https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp|svg))/gi
-  let limpo = texto.replace(regexMarkdown, (_, url) => { urls.push(url); return '' })
+  let limpo = texto.replace(regexMd, (_, url) => { urls.push(url); return '' })
   limpo = limpo.replace(regexUrl, (url) => { if (!urls.includes(url)) urls.push(url); return '' })
-  // Remove markdown bold **texto**
   limpo = limpo.replace(/\*\*(.*?)\*\*/g, '$1')
   return { textoLimpo: limpo.trim(), urls }
 }
@@ -38,7 +41,7 @@ function extrairImagensDoTexto(texto: string | null | undefined): { textoLimpo: 
 function QuestionImage({ url }: { url: string }) {
   const [broken, setBroken] = useState(false)
   if (broken) return (
-    <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] p-3 rounded-xl mb-3"
+    <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] p-3 rounded-xl mb-4"
       style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
       <ImageOff size={13} /> Imagem não disponível
     </div>
@@ -47,15 +50,21 @@ function QuestionImage({ url }: { url: string }) {
     // eslint-disable-next-line @next/next/no-img-element
     <img src={url} alt="Imagem da questão" onError={() => setBroken(true)}
       className="rounded-xl max-w-full h-auto mb-4 mx-auto block"
-      style={{ maxHeight: 420, objectFit: 'contain', background: 'rgba(255,255,255,0.03)' }} />
+      style={{ maxHeight: 400, objectFit: 'contain', background: 'rgba(255,255,255,0.03)' }} />
   )
 }
 
-function QuestionCard({ question, index, userAnswer, onAnswer }: {
+// ── Componente da questão individual ─────────────────────────
+function QuestionView({ question, globalIndex, total, userAnswer, onAnswer, onNext, onPrev, hasNext, hasPrev }: {
   question: Question
-  index: number
+  globalIndex: number
+  total: number
   userAnswer?: UserAnswerRow
   onAnswer: (id: string, resposta: string) => void
+  onNext: () => void
+  onPrev: () => void
+  hasNext: boolean
+  hasPrev: boolean
 }) {
   const [selected, setSelected] = useState<string | null>(userAnswer?.resposta ?? null)
   const [revealed, setRevealed] = useState(!!userAnswer?.resposta)
@@ -65,8 +74,8 @@ function QuestionCard({ question, index, userAnswer, onAnswer }: {
   const areaColor = area?.color ?? '#5c5cff'
   const acertou = selected === question.gabarito
 
-  const { textoLimpo: contextoLimpo, urls: urlsContexto } = extrairImagensDoTexto(question.contexto)
-  const { textoLimpo: enunciadoLimpo, urls: urlsEnunciado } = extrairImagensDoTexto(question.enunciado)
+  const { textoLimpo: contextoLimpo, urls: urlsContexto } = extrairImagens(question.contexto)
+  const { textoLimpo: enunciadoLimpo, urls: urlsEnunciado } = extrairImagens(question.enunciado)
   const todasUrls = [...urlsContexto, ...urlsEnunciado, ...(question.imagem_url ? [question.imagem_url] : [])]
     .filter((u, i, a) => a.indexOf(u) === i)
 
@@ -85,139 +94,173 @@ function QuestionCard({ question, index, userAnswer, onAnswer }: {
   }
 
   return (
-    <div className="card overflow-hidden animate-[fadeIn_0.3s_ease-out]">
-      {/* Cabeçalho colorido da questão */}
-      <div className="px-6 py-4 flex flex-wrap items-center justify-between gap-3"
-        style={{ background: `linear-gradient(135deg, ${areaColor}18, transparent)`, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-
-        {/* Lado esquerdo: número + vestibular + área */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Número da questão */}
-          <div className="flex items-center justify-center w-9 h-9 rounded-xl font-black text-sm text-white flex-shrink-0"
-            style={{ background: `linear-gradient(135deg, ${areaColor}, ${areaColor}99)` }}>
-            {index}
-          </div>
-
-          <div className="flex flex-col gap-0.5">
-            {/* Vestibular + Ano */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-black text-white tracking-wide">
-                {vestibular?.name ?? 'ENEM'}
-              </span>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-md"
-                style={{ background: 'rgba(92,92,255,0.15)', color: '#a3a3ff' }}>
-                {question.ano}
-              </span>
-              {question.numero && (
-                <span className="text-xs text-[var(--text-muted)]">· Q{question.numero}</span>
-              )}
-            </div>
-            {/* Área */}
-            {area && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm">{area.icon}</span>
-                <span className="text-xs font-semibold" style={{ color: areaColor }}>
-                  {area.name}
-                </span>
-              </div>
-            )}
-          </div>
+    <div className="space-y-4 animate-[fadeIn_0.25s_ease-out]">
+      {/* Barra de progresso da sessão */}
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-[var(--text-muted)] font-medium whitespace-nowrap">
+          {globalIndex} de {total}
+        </span>
+        <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+          <div className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${(globalIndex / total) * 100}%`, background: `linear-gradient(90deg, ${areaColor}, #a855f7)` }} />
         </div>
-
-        {/* Lado direito: dificuldade + status */}
-        <div className="flex items-center gap-2">
-          <span className="badge text-xs" style={{
-            background: question.dificuldade === 'facil' ? 'rgba(34,197,94,0.12)'
-              : question.dificuldade === 'dificil' ? 'rgba(239,68,68,0.1)' : 'rgba(251,191,36,0.1)',
-            color: question.dificuldade === 'facil' ? '#86efac'
-              : question.dificuldade === 'dificil' ? '#fca5a5' : '#fde68a',
-            border: `1px solid ${question.dificuldade === 'facil' ? 'rgba(34,197,94,0.25)'
-              : question.dificuldade === 'dificil' ? 'rgba(239,68,68,0.2)' : 'rgba(251,191,36,0.2)'}`,
-            textTransform: 'capitalize',
-          }}>
-            {question.dificuldade === 'facil' ? 'Fácil' : question.dificuldade === 'dificil' ? 'Difícil' : 'Médio'}
-          </span>
-          {revealed && (
-            <span className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ background: acertou ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.1)' }}>
-              {acertou
-                ? <CheckCircle size={14} className="text-[#22c55e]" />
-                : <XCircle size={14} className="text-[#ef4444]" />}
-            </span>
-          )}
-        </div>
+        <span className="text-xs text-[var(--text-muted)] font-medium whitespace-nowrap">
+          {Math.round((globalIndex / total) * 100)}%
+        </span>
       </div>
 
-      {/* Corpo da questão */}
-      <div className="p-6 md:p-8">
-        {/* Contexto */}
-        {contextoLimpo && (
-          <div className="p-4 rounded-2xl mb-5 text-sm text-[var(--text-secondary)] leading-relaxed"
-            style={{ background: 'rgba(255,255,255,0.03)', borderLeft: `3px solid ${areaColor}88` }}>
-            {contextoLimpo}
-          </div>
-        )}
-
-        {/* Imagens */}
-        {todasUrls.length > 0 && (
-          <div className="mb-5">
-            {todasUrls.map((url, i) => <QuestionImage key={i} url={url} />)}
-          </div>
-        )}
-
-        {/* Enunciado */}
-        <p className="text-white text-[15px] leading-relaxed mb-6 font-medium">
-          {enunciadoLimpo || question.enunciado}
-        </p>
-
-        {/* Alternativas */}
-        <div className="space-y-2.5">
-          {question.alternativas.map((alt) => (
-            <button key={alt.letra} onClick={() => handleAnswer(alt.letra)} disabled={revealed}
-              className={`alt-option w-full text-left ${getAltClass(alt.letra)}`}>
-              <span className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black"
-                style={{ background: 'rgba(92,92,255,0.12)', color: '#a3a3ff', minWidth: 32 }}>
-                {alt.letra}
-              </span>
-              <span className="text-sm text-[var(--text-secondary)] flex-1 leading-relaxed text-left">
-                {alt.texto}
-              </span>
-              {revealed && alt.letra === question.gabarito && <CheckCircle size={15} className="text-[#22c55e] flex-shrink-0" />}
-              {revealed && alt.letra === selected && alt.letra !== question.gabarito && <XCircle size={15} className="text-[#ef4444] flex-shrink-0" />}
-            </button>
-          ))}
-        </div>
-
-        {/* Resolução */}
-        {revealed && (
-          <div className="mt-5 p-4 rounded-2xl text-sm animate-[slideUp_0.3s_ease-out]" style={{
-            background: acertou ? 'rgba(34,197,94,0.05)' : 'rgba(239,68,68,0.04)',
-            border: `1px solid ${acertou ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.12)'}`
-          }}>
-            <div className="flex items-center gap-2 font-bold mb-2 text-sm"
-              style={{ color: acertou ? '#86efac' : '#fca5a5' }}>
-              {acertou
-                ? <><CheckCircle size={14} /> Correto! Gabarito: alternativa {question.gabarito}</>
-                : <><XCircle size={14} /> Incorreto. Gabarito: alternativa {question.gabarito}</>}
+      {/* Card principal da questão */}
+      <div className="card overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-4 flex items-center justify-between gap-3 flex-wrap"
+          style={{ background: `linear-gradient(135deg, ${areaColor}15, transparent)`, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="flex items-center gap-3">
+            {/* Número */}
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-white text-sm flex-shrink-0"
+              style={{ background: `linear-gradient(135deg, ${areaColor}, ${areaColor}88)` }}>
+              {globalIndex}
             </div>
-            {question.explicacao ? (
-              <div>
-                <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] mb-1.5">
-                  <BookOpen size={11} /> Resolução comentada
-                </div>
-                <p className="text-[var(--text-secondary)] leading-relaxed text-[13px]">{question.explicacao}</p>
+            <div>
+              {/* Vestibular + Ano */}
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-sm font-black text-white">{vestibular?.name ?? 'ENEM'}</span>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-lg"
+                  style={{ background: 'rgba(92,92,255,0.15)', color: '#a3a3ff' }}>
+                  {question.ano}
+                </span>
+                {question.numero && (
+                  <span className="text-xs text-[var(--text-muted)]">· Q{question.numero}</span>
+                )}
               </div>
-            ) : (
-              <p className="text-[var(--text-muted)] text-xs italic mt-1">Resolução ainda não disponível para esta questão.</p>
+              {/* Área */}
+              {area && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm leading-none">{area.icon}</span>
+                  <span className="text-xs font-semibold leading-none" style={{ color: areaColor }}>
+                    {area.name}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Direita: dificuldade + status */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold px-3 py-1 rounded-full" style={{
+              background: question.dificuldade === 'facil' ? 'rgba(34,197,94,0.12)'
+                : question.dificuldade === 'dificil' ? 'rgba(239,68,68,0.1)' : 'rgba(251,191,36,0.1)',
+              color: question.dificuldade === 'facil' ? '#86efac'
+                : question.dificuldade === 'dificil' ? '#fca5a5' : '#fde68a',
+              border: `1px solid ${question.dificuldade === 'facil' ? 'rgba(34,197,94,0.2)'
+                : question.dificuldade === 'dificil' ? 'rgba(239,68,68,0.18)' : 'rgba(251,191,36,0.18)'}`,
+            }}>
+              {question.dificuldade === 'facil' ? 'Fácil' : question.dificuldade === 'dificil' ? 'Difícil' : 'Médio'}
+            </span>
+            {revealed && (
+              <div className="w-7 h-7 rounded-full flex items-center justify-center"
+                style={{ background: acertou ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.12)' }}>
+                {acertou ? <CheckCircle size={14} className="text-[#22c55e]" /> : <XCircle size={14} className="text-[#ef4444]" />}
+              </div>
             )}
           </div>
-        )}
+        </div>
+
+        {/* Corpo */}
+        <div className="p-6 md:p-8">
+          {/* Contexto */}
+          {contextoLimpo && (
+            <div className="p-4 rounded-2xl mb-6 text-sm text-[var(--text-secondary)] leading-relaxed"
+              style={{ background: 'rgba(255,255,255,0.025)', borderLeft: `3px solid ${areaColor}66` }}>
+              {contextoLimpo}
+            </div>
+          )}
+
+          {/* Imagens */}
+          {todasUrls.length > 0 && (
+            <div className="mb-5">
+              {todasUrls.map((url, i) => <QuestionImage key={i} url={url} />)}
+            </div>
+          )}
+
+          {/* Enunciado */}
+          <p className="text-white text-[15px] md:text-base leading-relaxed mb-7 font-medium">
+            {enunciadoLimpo || question.enunciado}
+          </p>
+
+          {/* Alternativas */}
+          <div className="space-y-2.5">
+            {question.alternativas.map((alt) => (
+              <button key={alt.letra} onClick={() => handleAnswer(alt.letra)} disabled={revealed}
+                className={`alt-option w-full text-left ${getAltClass(alt.letra)}`}>
+                <span className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black"
+                  style={{ background: 'rgba(92,92,255,0.1)', color: '#a3a3ff', minWidth: 32 }}>
+                  {alt.letra}
+                </span>
+                <span className="text-sm text-[var(--text-secondary)] flex-1 leading-relaxed text-left">
+                  {alt.texto}
+                </span>
+                {revealed && alt.letra === question.gabarito && <CheckCircle size={15} className="text-[#22c55e] flex-shrink-0" />}
+                {revealed && alt.letra === selected && alt.letra !== question.gabarito && <XCircle size={15} className="text-[#ef4444] flex-shrink-0" />}
+              </button>
+            ))}
+          </div>
+
+          {/* Feedback */}
+          {revealed && (
+            <div className="mt-6 p-5 rounded-2xl animate-[slideUp_0.3s_ease-out]" style={{
+              background: acertou ? 'rgba(34,197,94,0.05)' : 'rgba(239,68,68,0.04)',
+              border: `1px solid ${acertou ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.12)'}`
+            }}>
+              <div className="flex items-center gap-2 font-bold text-sm mb-3"
+                style={{ color: acertou ? '#86efac' : '#fca5a5' }}>
+                {acertou
+                  ? <><CheckCircle size={15} /> Correto! Gabarito: alternativa {question.gabarito}</>
+                  : <><XCircle size={15} /> Incorreto. Gabarito: alternativa {question.gabarito}</>}
+              </div>
+              {question.explicacao ? (
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] mb-2">
+                    <BookOpen size={11} /> Resolução comentada
+                  </div>
+                  <p className="text-[var(--text-secondary)] text-sm leading-relaxed">{question.explicacao}</p>
+                </div>
+              ) : (
+                <p className="text-[var(--text-muted)] text-xs italic">Resolução ainda não disponível.</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Rodapé de navegação */}
+        <div className="px-6 py-4 flex items-center justify-between gap-3"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.15)' }}>
+          <button onClick={onPrev} disabled={!hasPrev}
+            className="btn-ghost gap-2 disabled:opacity-30 disabled:cursor-not-allowed text-sm">
+            <ArrowLeft size={15} /> Anterior
+          </button>
+
+          {/* Pular se não respondeu ainda */}
+          {!revealed && (
+            <button onClick={onNext} disabled={!hasNext}
+              className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-white transition-colors disabled:opacity-30"
+              style={{ }}>
+              <SkipForward size={13} /> Pular
+            </button>
+          )}
+
+          {revealed && (
+            <button onClick={onNext} disabled={!hasNext}
+              className="btn-primary text-sm gap-2 disabled:opacity-40">
+              {hasNext ? <>Próxima <ArrowRight size={15} /></> : 'Fim desta página'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
 }
 
-// ── Componente de filtro bonito ───────────────────────────────
+// ── Filtro select estilizado ──────────────────────────────────
 function FilterSelect({ value, onChange, placeholder, options }: {
   value: string
   onChange: (v: string) => void
@@ -226,16 +269,13 @@ function FilterSelect({ value, onChange, placeholder, options }: {
 }) {
   return (
     <div className="relative">
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
+      <select value={value} onChange={e => onChange(e.target.value)}
         className="appearance-none pl-4 pr-9 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-200"
         style={{
           background: value ? 'rgba(92,92,255,0.12)' : 'rgba(255,255,255,0.04)',
           border: `1px solid ${value ? 'rgba(92,92,255,0.35)' : 'rgba(255,255,255,0.08)'}`,
           color: value ? '#c4c4ff' : 'var(--text-secondary)',
-          outline: 'none',
-          minWidth: 160,
+          outline: 'none', minWidth: 150,
         }}>
         <option value="">{placeholder}</option>
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -250,17 +290,23 @@ function FilterSelect({ value, onChange, placeholder, options }: {
   )
 }
 
+// ── Componente principal ──────────────────────────────────────
 export default function QuestoesClient({
   questions, areas, vestibulares, userAnswers, total, page, pageSize, filters
 }: Props) {
   const router = useRouter()
   const supabase = createClient()
-  const totalPages = Math.ceil(total / pageSize)
+  const [currentIndex, setCurrentIndex] = useState(0) // índice local na página
   const answersMap = Object.fromEntries(userAnswers.map(a => [a.question_id, a]))
-  const temFiltro = !!(filters.area || filters.vestibular || filters.ano)
 
-  // Offset para número da questão na página atual
   const offset = (page - 1) * pageSize
+  const totalPages = Math.ceil(total / pageSize)
+  const temFiltro = !!(filters.area || filters.vestibular || filters.ano)
+  const areaAtiva = areas.find(a => a.slug === filters.area)
+  const vestAtivo = vestibulares.find(v => v.slug === filters.vestibular)
+
+  const currentQuestion = questions[currentIndex]
+  const globalIndex = offset + currentIndex + 1
 
   async function handleAnswer(questionId: string, resposta: string) {
     const question = questions.find(q => q.id === questionId)
@@ -275,26 +321,55 @@ export default function QuestoesClient({
     const params = new URLSearchParams()
     Object.entries({ ...filters, [key]: value, page: '1' }).forEach(([k, v]) => { if (v) params.set(k, v) })
     router.push('/questoes?' + params.toString())
+    setCurrentIndex(0)
   }
 
   function clearFilter(key: string) {
     const params = new URLSearchParams()
     Object.entries(filters).forEach(([k, v]) => { if (k !== key && k !== 'page' && v) params.set(k, v) })
     router.push('/questoes?' + params.toString())
+    setCurrentIndex(0)
   }
 
-  const areaAtiva = areas.find(a => a.slug === filters.area)
+  function goNext() {
+    if (currentIndex < questions.length - 1) {
+      setCurrentIndex(i => i + 1)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else if (page < totalPages) {
+      // Vai para a próxima página
+      const params = new URLSearchParams()
+      Object.entries({ ...filters, page: String(page + 1) }).forEach(([k, v]) => { if (v) params.set(k, v) })
+      router.push('/questoes?' + params.toString())
+      setCurrentIndex(0)
+    }
+  }
+
+  function goPrev() {
+    if (currentIndex > 0) {
+      setCurrentIndex(i => i - 1)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else if (page > 1) {
+      // Vai para a página anterior, última questão
+      const params = new URLSearchParams()
+      Object.entries({ ...filters, page: String(page - 1) }).forEach(([k, v]) => { if (v) params.set(k, v) })
+      router.push('/questoes?' + params.toString())
+      setCurrentIndex(pageSize - 1)
+    }
+  }
+
+  const hasNext = currentIndex < questions.length - 1 || page < totalPages
+  const hasPrev = currentIndex > 0 || page > 1
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 max-w-3xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-black text-white">Banco de Questões</h1>
-          <p className="text-[var(--text-secondary)] text-sm mt-1">
+          <p className="text-[var(--text-secondary)] text-sm mt-0.5">
             <span className="font-semibold text-white">{total.toLocaleString('pt-BR')}</span> questões
-            {areaAtiva && <span> de <span style={{ color: areaAtiva.color ?? '#a3a3ff' }}>{areaAtiva.icon} {areaAtiva.name}</span></span>}
-            {filters.vestibular && <span> · {vestibulares.find(v => v.slug === filters.vestibular)?.name}</span>}
+            {areaAtiva && <span> · <span style={{ color: areaAtiva.color ?? '#a3a3ff' }}>{areaAtiva.icon} {areaAtiva.name}</span></span>}
+            {vestAtivo && <span> · {vestAtivo.name}</span>}
             {filters.ano && <span> · {filters.ano}</span>}
           </p>
         </div>
@@ -303,114 +378,129 @@ export default function QuestoesClient({
       {/* Filtros */}
       <div className="card p-4">
         <div className="flex items-center gap-2 mb-3">
-          <SlidersHorizontal size={14} className="text-[var(--text-muted)]" />
+          <SlidersHorizontal size={13} className="text-[var(--text-muted)]" />
           <span className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Filtrar por</span>
           {temFiltro && (
-            <button onClick={() => router.push('/questoes')}
+            <button onClick={() => { router.push('/questoes'); setCurrentIndex(0) }}
               className="ml-auto flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-white transition-colors px-2 py-1 rounded-lg"
               style={{ background: 'rgba(255,255,255,0.05)' }}>
-              <X size={11} /> Limpar
+              <RotateCcw size={10} /> Limpar
             </button>
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          <FilterSelect
-            value={filters.area ?? ''}
+          <FilterSelect value={filters.area ?? ''} placeholder="📚 Disciplina"
             onChange={v => v ? updateFilter('area', v) : clearFilter('area')}
-            placeholder="📚 Disciplina"
-            options={areas.map(a => ({ value: a.slug, label: `${a.icon} ${a.name}` }))}
-          />
-          <FilterSelect
-            value={filters.vestibular ?? ''}
+            options={areas.map(a => ({ value: a.slug, label: `${a.icon} ${a.name}` }))} />
+          <FilterSelect value={filters.vestibular ?? ''} placeholder="🏫 Vestibular"
             onChange={v => v ? updateFilter('vestibular', v) : clearFilter('vestibular')}
-            placeholder="🏫 Vestibular"
-            options={vestibulares.map(v => ({ value: v.slug, label: v.name }))}
-          />
-          <FilterSelect
-            value={filters.ano ?? ''}
+            options={vestibulares.map(v => ({ value: v.slug, label: v.name }))} />
+          <FilterSelect value={filters.ano ?? ''} placeholder="📅 Ano"
             onChange={v => v ? updateFilter('ano', v) : clearFilter('ano')}
-            placeholder="📅 Ano"
             options={Array.from({ length: 2024 - 2011 + 1 }, (_, i) => {
-              const y = 2024 - i
-              return { value: String(y), label: String(y) }
-            })}
-          />
+              const y = 2024 - i; return { value: String(y), label: String(y) }
+            })} />
         </div>
 
-        {/* Tags de filtros ativos */}
+        {/* Tags ativas */}
         {temFiltro && (
           <div className="flex flex-wrap gap-2 mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
             {filters.area && areaAtiva && (
-              <span className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full font-medium"
-                style={{ background: (areaAtiva.color ?? '#5c5cff') + '20', color: areaAtiva.color ?? '#a3a3ff', border: `1px solid ${areaAtiva.color ?? '#5c5cff'}40` }}>
+              <span className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium"
+                style={{ background: (areaAtiva.color ?? '#5c5cff') + '20', color: areaAtiva.color ?? '#a3a3ff', border: `1px solid ${areaAtiva.color ?? '#5c5cff'}35` }}>
                 {areaAtiva.icon} {areaAtiva.name}
-                <button onClick={() => clearFilter('area')} className="hover:opacity-70"><X size={10} /></button>
+                <button onClick={() => clearFilter('area')}><X size={10} /></button>
               </span>
             )}
             {filters.vestibular && (
-              <span className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full font-medium"
+              <span className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium"
                 style={{ background: 'rgba(92,92,255,0.12)', color: '#a3a3ff', border: '1px solid rgba(92,92,255,0.25)' }}>
                 🏫 {vestibulares.find(v => v.slug === filters.vestibular)?.name}
-                <button onClick={() => clearFilter('vestibular')} className="hover:opacity-70"><X size={10} /></button>
+                <button onClick={() => clearFilter('vestibular')}><X size={10} /></button>
               </span>
             )}
             {filters.ano && (
-              <span className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full font-medium"
+              <span className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium"
                 style={{ background: 'rgba(251,191,36,0.1)', color: '#fde68a', border: '1px solid rgba(251,191,36,0.2)' }}>
                 📅 {filters.ano}
-                <button onClick={() => clearFilter('ano')} className="hover:opacity-70"><X size={10} /></button>
+                <button onClick={() => clearFilter('ano')}><X size={10} /></button>
               </span>
             )}
           </div>
         )}
       </div>
 
-      {/* Lista */}
+      {/* Questão atual OU estado vazio */}
       {questions.length === 0 ? (
         <div className="card p-16 text-center">
           <div className="text-5xl mb-4">🔍</div>
           <h3 className="text-white font-bold mb-2">Nenhuma questão encontrada</h3>
           <p className="text-[var(--text-secondary)] text-sm">Tente ajustar os filtros acima</p>
         </div>
-      ) : (
-        <div className="space-y-5 stagger-in">
-          {questions.map((q, i) => (
-            <QuestionCard key={q.id} question={q} index={offset + i + 1}
-              userAnswer={answersMap[q.id]} onAnswer={handleAnswer} />
-          ))}
-        </div>
-      )}
+      ) : currentQuestion ? (
+        <QuestionView
+          question={currentQuestion}
+          globalIndex={globalIndex}
+          total={total}
+          userAnswer={answersMap[currentQuestion.id]}
+          onAnswer={handleAnswer}
+          onNext={goNext}
+          onPrev={goPrev}
+          hasNext={hasNext}
+          hasPrev={hasPrev}
+        />
+      ) : null}
 
-      {/* Paginação */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3 pt-2">
-          <button onClick={() => updateFilter('page', String(page - 1))} disabled={page <= 1}
-            className="btn-ghost gap-1.5 disabled:opacity-30">
-            <ChevronLeft size={15} /> Anterior
-          </button>
-          <div className="flex items-center gap-1">
-            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-              const p = page <= 3 ? i + 1 : page - 2 + i
-              if (p < 1 || p > totalPages) return null
+      {/* Mini mapa de questões da página */}
+      {questions.length > 1 && (
+        <div className="card p-4">
+          <p className="text-xs text-[var(--text-muted)] mb-3 font-semibold uppercase tracking-wider">
+            Questões desta página
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {questions.map((q, i) => {
+              const ans = answersMap[q.id]
+              const isActive = i === currentIndex
               return (
-                <button key={p} onClick={() => updateFilter('page', String(p))}
-                  className="w-9 h-9 rounded-xl text-sm font-semibold transition-all"
-                  style={p === page ? {
+                <button key={q.id} onClick={() => { setCurrentIndex(i); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                  className="w-9 h-9 rounded-xl text-xs font-bold transition-all duration-150 flex-shrink-0"
+                  style={isActive ? {
                     background: 'linear-gradient(135deg, #5c5cff, #a855f7)',
                     color: 'white',
+                    boxShadow: '0 0 12px rgba(92,92,255,0.4)',
+                  } : ans ? {
+                    background: ans.correta ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.12)',
+                    color: ans.correta ? '#86efac' : '#fca5a5',
+                    border: `1px solid ${ans.correta ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.25)'}`,
                   } : {
+                    background: 'rgba(255,255,255,0.05)',
                     color: 'var(--text-muted)',
-                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.07)',
                   }}>
-                  {p}
+                  {offset + i + 1}
                 </button>
               )
             })}
           </div>
-          <button onClick={() => updateFilter('page', String(page + 1))} disabled={page >= totalPages}
-            className="btn-ghost gap-1.5 disabled:opacity-30">
-            Próxima <ChevronRight size={15} />
-          </button>
+          {/* Legenda */}
+          <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/5">
+            <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+              <div className="w-3 h-3 rounded-sm" style={{ background: 'linear-gradient(135deg, #5c5cff, #a855f7)' }} />
+              Atual
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+              <div className="w-3 h-3 rounded-sm" style={{ background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)' }} />
+              Acertou
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+              <div className="w-3 h-3 rounded-sm" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }} />
+              Errou
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+              <div className="w-3 h-3 rounded-sm" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }} />
+              Não respondida
+            </div>
+          </div>
         </div>
       )}
     </div>

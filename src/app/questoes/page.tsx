@@ -35,14 +35,30 @@ export default async function QuestoesPage({
   const { data: areas } = await supabase.from('areas').select('*').order('name')
   const { data: vestibulares } = await supabase.from('vestibulares').select('*').order('name')
 
+  const page = parseInt(searchParams.page ?? '1')
+  const pageSize = 10
+
+  // Resolve area_id e vestibular_id a partir dos slugs
+  let areaId: number | null = null
+  let vestibularId: number | null = null
+
+  if (searchParams.area) {
+    const area = (areas ?? []).find(a => a.slug === searchParams.area)
+    areaId = area?.id ?? null
+  }
+  if (searchParams.vestibular) {
+    const vest = (vestibulares ?? []).find(v => v.slug === searchParams.vestibular)
+    vestibularId = vest?.id ?? null
+  }
+
+  // Query usando IDs diretos — sem join filter
   let query = supabase
     .from('questions')
     .select('*, areas(*), vestibulares(*)', { count: 'exact' })
     .eq('ativo', true)
 
-  const page = parseInt(searchParams.page ?? '1')
-  const pageSize = 10
-
+  if (areaId)       query = query.eq('area_id', areaId)
+  if (vestibularId) query = query.eq('vestibular_id', vestibularId)
   if (searchParams.ano) query = query.eq('ano', parseInt(searchParams.ano))
 
   const { data: questions, count } = await query

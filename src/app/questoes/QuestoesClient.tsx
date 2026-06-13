@@ -23,26 +23,50 @@ interface Props {
   filters: Record<string, string | undefined>
 }
 
-function isValidImageUrl(url: string | null | undefined): boolean {
-  if (!url || url.trim() === '') return false
-  if (url.includes('undefined') || url.includes('null') || url.includes('placeholder')) return false
-  try { new URL(url); return true } catch { return false }
+// Extrai URLs de imagem do texto (formato Markdown ![](url) ou url direta)
+function extrairImagensDoTexto(texto: string | null | undefined): { textoLimpo: string; urls: string[] } {
+  if (!texto) return { textoLimpo: '', urls: [] }
+
+  const urls: string[] = []
+  // Captura ![...](url) ou ![](url)
+  const regexMarkdown = /!\[.*?\]\((https?:\/\/[^\s)]+)\)/g
+  // Captura URLs de imagem soltas
+  const regexUrl = /(https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp|svg))/gi
+
+  let textoLimpo = texto.replace(regexMarkdown, (_, url) => {
+    urls.push(url)
+    return '' // remove do texto
+  })
+
+  textoLimpo = textoLimpo.replace(regexUrl, (url) => {
+    if (!urls.includes(url)) urls.push(url)
+    return ''
+  })
+
+  return { textoLimpo: textoLimpo.trim(), urls }
 }
 
 function QuestionImage({ url }: { url: string }) {
   const [broken, setBroken] = useState(false)
+
   if (broken) {
     return (
-      <div className="mb-4 flex items-center gap-2 text-xs text-[var(--text-muted)] p-3 rounded-xl"
+      <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] p-3 rounded-xl mb-3"
         style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
         <ImageOff size={14} /> Imagem não disponível
       </div>
     )
   }
+
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={url} alt="Imagem da questão" onError={() => setBroken(true)}
-      className="mb-4 rounded-xl max-w-full h-auto" style={{ maxHeight: 400, objectFit: 'contain' }} />
+    <img
+      src={url}
+      alt="Imagem da questão"
+      onError={() => setBroken(true)}
+      className="rounded-xl max-w-full h-auto mb-3"
+      style={{ maxHeight: 420, objectFit: 'contain', background: 'rgba(255,255,255,0.04)' }}
+    />
   )
 }
 
@@ -58,6 +82,17 @@ function QuestionCard({ question, userAnswer, onAnswer }: {
   const vestibular = question.vestibulares as unknown as Vestibular | undefined
   const areaColor = area?.color ?? '#5c5cff'
   const acertou = selected === question.gabarito
+
+  // Extrai imagens escondidas dentro do contexto e do enunciado
+  const { textoLimpo: contextoLimpo, urls: urlsContexto } = extrairImagensDoTexto(question.contexto)
+  const { textoLimpo: enunciadoLimpo, urls: urlsEnunciado } = extrairImagensDoTexto(question.enunciado)
+
+  // Junta todas as URLs de imagem (contexto + enunciado + imagem_url direta)
+  const todasUrls = [
+    ...urlsContexto,
+    ...urlsEnunciado,
+    ...(question.imagem_url ? [question.imagem_url] : []),
+  ].filter((url, i, arr) => arr.indexOf(url) === i) // dedup
 
   function handleAnswer(letra: string) {
     if (revealed) return
@@ -108,19 +143,25 @@ function QuestionCard({ question, userAnswer, onAnswer }: {
         </span>
       </div>
 
-      {/* Contexto */}
-      {question.contexto && (
+      {/* Contexto (texto limpo, sem as URLs) */}
+      {contextoLimpo && (
         <div className="p-4 rounded-xl mb-4 text-sm text-[var(--text-secondary)] leading-relaxed"
           style={{ background: 'rgba(255,255,255,0.03)', borderLeft: '2px solid rgba(92,92,255,0.4)' }}>
-          {question.contexto}
+          {contextoLimpo}
         </div>
       )}
 
-      {/* Imagem */}
-      {isValidImageUrl(question.imagem_url) && <QuestionImage url={question.imagem_url!} />}
+      {/* Todas as imagens extraídas */}
+      {todasUrls.length > 0 && (
+        <div className="mb-4 space-y-2">
+          {todasUrls.map((url, i) => <QuestionImage key={i} url={url} />)}
+        </div>
+      )}
 
-      {/* Enunciado */}
-      <p className="text-white text-base leading-relaxed mb-6">{question.enunciado}</p>
+      {/* Enunciado (texto limpo) */}
+      <p className="text-white text-base leading-relaxed mb-6 font-medium">
+        {enunciadoLimpo || question.enunciado}
+      </p>
 
       {/* Alternativas */}
       <div className="space-y-2">
@@ -179,8 +220,6 @@ export default function QuestoesClient({
 
   const areaAtiva = areas.find(a => a.slug === filters.area)
   const vestAtivo = vestibulares.find(v => v.slug === filters.vestibular)
-
-  // Descrição do total sem typo
   const totalStr = total === 1 ? '1 questão' : `${total.toLocaleString('pt-BR')} questões`
 
   async function handleAnswer(questionId: string, resposta: string) {
@@ -210,7 +249,6 @@ export default function QuestoesClient({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-black text-white">Banco de Questões</h1>
         <p className="text-[var(--text-secondary)] text-sm mt-1">
@@ -221,24 +259,20 @@ export default function QuestoesClient({
         </p>
       </div>
 
-      {/* Filtros */}
       <div className="card p-4 flex flex-wrap gap-3 items-center">
         <Filter size={14} className="text-[var(--text-muted)]" />
-
         <select className="input w-auto text-sm py-2"
           value={filters.area ?? ''}
           onChange={e => e.target.value ? updateFilter('area', e.target.value) : clearFilter('area')}>
           <option value="">Todas as disciplinas</option>
           {areas.map(a => <option key={a.id} value={a.slug}>{a.icon} {a.name}</option>)}
         </select>
-
         <select className="input w-auto text-sm py-2"
           value={filters.vestibular ?? ''}
           onChange={e => e.target.value ? updateFilter('vestibular', e.target.value) : clearFilter('vestibular')}>
           <option value="">Todos os vestibulares</option>
           {vestibulares.map(v => <option key={v.id} value={v.slug}>{v.name}</option>)}
         </select>
-
         <select className="input w-auto text-sm py-2"
           value={filters.ano ?? ''}
           onChange={e => e.target.value ? updateFilter('ano', e.target.value) : clearFilter('ano')}>
@@ -247,7 +281,6 @@ export default function QuestoesClient({
             <option key={y} value={y}>{y}</option>
           ))}
         </select>
-
         {(filters.area || filters.vestibular || filters.ano) && (
           <button onClick={() => router.push('/questoes')}
             className="text-xs text-[var(--text-muted)] hover:text-white transition-colors px-3 py-2 rounded-lg"
@@ -257,7 +290,6 @@ export default function QuestoesClient({
         )}
       </div>
 
-      {/* Lista */}
       {questions.length === 0 ? (
         <div className="card p-16 text-center">
           <div className="text-4xl mb-4">🔍</div>
@@ -272,7 +304,6 @@ export default function QuestoesClient({
         </div>
       )}
 
-      {/* Paginação */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-4">
           <button onClick={() => updateFilter('page', String(page - 1))} disabled={page <= 1}

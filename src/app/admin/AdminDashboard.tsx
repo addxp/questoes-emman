@@ -1,4 +1,6 @@
 // src/app/admin/AdminDashboard.tsx
+"use client"
+
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Area, Vestibular } from '@/types'

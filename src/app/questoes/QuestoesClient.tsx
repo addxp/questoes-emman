@@ -1,13 +1,12 @@
 'use client'
 // src/app/questoes/QuestoesClient.tsx
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Question, Area, Vestibular } from '@/types'
 import {
-  ChevronLeft, ChevronRight, CheckCircle, XCircle,
-  BookOpen, ImageOff, SlidersHorizontal, X,
-  ArrowLeft, ArrowRight, SkipForward, RotateCcw
+  CheckCircle, XCircle, BookOpen, ImageOff,
+  SlidersHorizontal, X, ArrowLeft, ArrowRight,
+  SkipForward, RotateCcw
 } from 'lucide-react'
 
 interface UserAnswerRow {
@@ -54,19 +53,25 @@ function QuestionImage({ url }: { url: string }) {
   )
 }
 
-function QuestionView({ question, globalIndex, total, userAnswer, onAnswer, onNext, onPrev, hasNext, hasPrev }: {
+function QuestionView({ question, globalIndex, total, sessionAnswer, onAnswer, onNext, onPrev, hasNext, hasPrev }: {
   question: Question
   globalIndex: number
   total: number
-  userAnswer?: UserAnswerRow
+  sessionAnswer?: UserAnswerRow
   onAnswer: (id: string, resposta: string) => void
   onNext: () => void
   onPrev: () => void
   hasNext: boolean
   hasPrev: boolean
 }) {
-  const [selected, setSelected] = useState<string | null>(userAnswer?.resposta ?? null)
-  const [revealed, setRevealed] = useState(!!userAnswer?.resposta)
+  const [selected, setSelected] = useState<string | null>(null)
+  const [revealed, setRevealed] = useState(false)
+
+  // Reseta completamente ao trocar de questão
+  useEffect(() => {
+    setSelected(null)
+    setRevealed(false)
+  }, [question.id])
 
   const area = question.areas as unknown as Area | undefined
   const vestibular = question.vestibulares as unknown as Vestibular | undefined
@@ -94,16 +99,23 @@ function QuestionView({ question, globalIndex, total, userAnswer, onAnswer, onNe
 
   return (
     <div className="space-y-4 animate-[fadeIn_0.25s_ease-out]">
+      {/* Progresso */}
       <div className="flex items-center gap-3">
-        <span className="text-xs text-[var(--text-muted)] font-medium whitespace-nowrap">{globalIndex} de {total}</span>
+        <span className="text-xs text-[var(--text-muted)] font-medium whitespace-nowrap">
+          {globalIndex} de {total}
+        </span>
         <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
           <div className="h-full rounded-full transition-all duration-500"
             style={{ width: `${(globalIndex / total) * 100}%`, background: `linear-gradient(90deg, ${areaColor}, #a855f7)` }} />
         </div>
-        <span className="text-xs text-[var(--text-muted)] font-medium">{Math.round((globalIndex / total) * 100)}%</span>
+        <span className="text-xs text-[var(--text-muted)] font-medium">
+          {Math.round((globalIndex / total) * 100)}%
+        </span>
       </div>
 
+      {/* Card */}
       <div className="card overflow-hidden">
+        {/* Header */}
         <div className="px-6 py-4 flex items-center justify-between gap-3 flex-wrap"
           style={{ background: `linear-gradient(135deg, ${areaColor}15, transparent)`, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
           <div className="flex items-center gap-3">
@@ -123,7 +135,7 @@ function QuestionView({ question, globalIndex, total, userAnswer, onAnswer, onNe
               {area && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm leading-none">{area.icon}</span>
-                  <span className="text-xs font-semibold leading-none" style={{ color: areaColor }}>{area.name}</span>
+                  <span className="text-xs font-semibold" style={{ color: areaColor }}>{area.name}</span>
                 </div>
               )}
             </div>
@@ -145,6 +157,7 @@ function QuestionView({ question, globalIndex, total, userAnswer, onAnswer, onNe
           </div>
         </div>
 
+        {/* Corpo */}
         <div className="p-6 md:p-8">
           {contextoLimpo && (
             <div className="p-4 rounded-2xl mb-6 text-sm text-[var(--text-secondary)] leading-relaxed"
@@ -166,12 +179,15 @@ function QuestionView({ question, globalIndex, total, userAnswer, onAnswer, onNe
                   style={{ background: 'rgba(92,92,255,0.1)', color: '#a3a3ff', minWidth: 32 }}>
                   {alt.letra}
                 </span>
-                <span className="text-sm text-[var(--text-secondary)] flex-1 leading-relaxed text-left">{alt.texto}</span>
+                <span className="text-sm text-[var(--text-secondary)] flex-1 leading-relaxed text-left">
+                  {alt.texto}
+                </span>
                 {revealed && alt.letra === question.gabarito && <CheckCircle size={15} className="text-[#22c55e] flex-shrink-0" />}
                 {revealed && alt.letra === selected && alt.letra !== question.gabarito && <XCircle size={15} className="text-[#ef4444] flex-shrink-0" />}
               </button>
             ))}
           </div>
+
           {revealed && (
             <div className="mt-6 p-5 rounded-2xl animate-[slideUp_0.3s_ease-out]" style={{
               background: acertou ? 'rgba(34,197,94,0.05)' : 'rgba(239,68,68,0.04)',
@@ -179,11 +195,15 @@ function QuestionView({ question, globalIndex, total, userAnswer, onAnswer, onNe
             }}>
               <div className="flex items-center gap-2 font-bold text-sm mb-3"
                 style={{ color: acertou ? '#86efac' : '#fca5a5' }}>
-                {acertou ? <><CheckCircle size={15} /> Correto! Gabarito: {question.gabarito}</> : <><XCircle size={15} /> Incorreto. Gabarito: {question.gabarito}</>}
+                {acertou
+                  ? <><CheckCircle size={15} /> Correto! Gabarito: {question.gabarito}</>
+                  : <><XCircle size={15} /> Incorreto. Gabarito: {question.gabarito}</>}
               </div>
               {question.explicacao ? (
                 <div>
-                  <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] mb-2"><BookOpen size={11} /> Resolução</div>
+                  <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] mb-2">
+                    <BookOpen size={11} /> Resolução
+                  </div>
                   <p className="text-[var(--text-secondary)] text-sm leading-relaxed">{question.explicacao}</p>
                 </div>
               ) : (
@@ -193,19 +213,23 @@ function QuestionView({ question, globalIndex, total, userAnswer, onAnswer, onNe
           )}
         </div>
 
-        <div className="px-6 py-4 flex items-center justify-between gap-3"
+        {/* Navegação */}
+        <div className="px-6 py-4 flex items-center justify-between"
           style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.15)' }}>
-          <button onClick={onPrev} disabled={!hasPrev} className="btn-ghost gap-2 disabled:opacity-30 text-sm">
+          <button onClick={onPrev} disabled={!hasPrev}
+            className="btn-ghost gap-2 disabled:opacity-30 text-sm">
             <ArrowLeft size={15} /> Anterior
           </button>
+
           {!revealed ? (
             <button onClick={onNext} disabled={!hasNext}
               className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-white transition-colors disabled:opacity-30">
               <SkipForward size={13} /> Pular
             </button>
           ) : (
-            <button onClick={onNext} disabled={!hasNext} className="btn-primary text-sm gap-2 disabled:opacity-40">
-              {hasNext ? <>Próxima <ArrowRight size={15} /></> : 'Fim desta página'}
+            <button onClick={onNext} disabled={!hasNext}
+              className="btn-primary text-sm gap-2 disabled:opacity-40">
+              {hasNext ? <>Próxima <ArrowRight size={15} /></> : '✓ Fim'}
             </button>
           )}
         </div>
@@ -214,13 +238,13 @@ function QuestionView({ question, globalIndex, total, userAnswer, onAnswer, onNe
   )
 }
 
+// ── Componente principal ──────────────────────────────────────
 export default function QuestoesClient({
   questions, areas, vestibulares, userAnswers, total, page, pageSize, filters
 }: Props) {
-  const router = useRouter()
   const supabase = createClient()
   const [currentIndex, setCurrentIndex] = useState(0)
-  const answersMap = Object.fromEntries(userAnswers.map(a => [a.question_id, a]))
+  const [sessionAnswers, setSessionAnswers] = useState<Record<string, UserAnswerRow>>({})
 
   const offset = (page - 1) * pageSize
   const totalPages = Math.ceil(total / pageSize)
@@ -229,22 +253,28 @@ export default function QuestoesClient({
   const vestAtivo = vestibulares.find(v => v.slug === filters.vestibular)
   const currentQuestion = questions[currentIndex]
   const globalIndex = offset + currentIndex + 1
+  const hasNext = currentIndex < questions.length - 1 || page < totalPages
+  const hasPrev = currentIndex > 0 || page > 1
 
   async function handleAnswer(questionId: string, resposta: string) {
     const question = questions.find(q => q.id === questionId)
     if (!question) return
+    const correta = resposta === question.gabarito
+    setSessionAnswers(prev => ({ ...prev, [questionId]: { question_id: questionId, resposta, correta } }))
     await supabase.from('user_answers').upsert(
-      { question_id: questionId, resposta, correta: resposta === question.gabarito, exam_id: null },
+      { question_id: questionId, resposta, correta, exam_id: null },
       { onConflict: 'user_id,question_id,exam_id' }
     )
   }
 
-  // ── Filtros: usa window.location para forçar reload completo ──
-  function applyFilter(key: string, value: string) {
+  function buildUrl(overrides: Record<string, string>) {
     const params = new URLSearchParams()
-    const current = { ...filters, page: '1', [key]: value }
-    Object.entries(current).forEach(([k, v]) => { if (v) params.set(k, v) })
-    window.location.href = '/questoes?' + params.toString()
+    Object.entries({ ...filters, ...overrides }).forEach(([k, v]) => { if (v) params.set(k, v) })
+    return '/questoes?' + params.toString()
+  }
+
+  function applyFilter(key: string, value: string) {
+    window.location.href = buildUrl({ [key]: value, page: '1' })
   }
 
   function removeFilter(key: string) {
@@ -253,18 +283,14 @@ export default function QuestoesClient({
     window.location.href = '/questoes?' + params.toString()
   }
 
-  function clearAllFilters() {
-    window.location.href = '/questoes'
-  }
-
   function goNext() {
     if (currentIndex < questions.length - 1) {
+      // próxima questão na mesma página
       setCurrentIndex(i => i + 1)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } else if (page < totalPages) {
-      const params = new URLSearchParams()
-      Object.entries({ ...filters, page: String(page + 1) }).forEach(([k, v]) => { if (v) params.set(k, v) })
-      window.location.href = '/questoes?' + params.toString()
+      // vai para a próxima página (questão 1 dela)
+      window.location.href = buildUrl({ page: String(page + 1) })
     }
   }
 
@@ -273,117 +299,79 @@ export default function QuestoesClient({
       setCurrentIndex(i => i - 1)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } else if (page > 1) {
-      const params = new URLSearchParams()
-      Object.entries({ ...filters, page: String(page - 1) }).forEach(([k, v]) => { if (v) params.set(k, v) })
-      window.location.href = '/questoes?' + params.toString()
+      // vai para a última questão da página anterior
+      window.location.href = buildUrl({ page: String(page - 1) })
     }
   }
 
-  const hasNext = currentIndex < questions.length - 1 || page < totalPages
-  const hasPrev = currentIndex > 0 || page > 1
+  function StyledSelect({ value, onChange, placeholder, children }: {
+    value: string; onChange: (v: string) => void; placeholder: string; children: React.ReactNode
+  }) {
+    return (
+      <div className="relative">
+        <select value={value} onChange={e => onChange(e.target.value)} style={{
+          appearance: 'none', WebkitAppearance: 'none',
+          paddingLeft: 14, paddingRight: 36, paddingTop: 10, paddingBottom: 10,
+          borderRadius: 12, fontSize: 14, fontWeight: 500, cursor: 'pointer', outline: 'none', minWidth: 140,
+          background: value ? 'rgba(92,92,255,0.12)' : 'rgba(255,255,255,0.04)',
+          border: `1px solid ${value ? 'rgba(92,92,255,0.4)' : 'rgba(255,255,255,0.08)'}`,
+          color: value ? '#c4c4ff' : '#9898c8',
+        }}>
+          <option value="">{placeholder}</option>
+          {children}
+        </select>
+        <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: value ? '#a3a3ff' : '#5a5a8a' }}>
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
+            <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
+      {/* Header */}
       <div>
         <h1 className="text-2xl font-black text-white">Banco de Questões</h1>
         <p className="text-[var(--text-secondary)] text-sm mt-0.5">
           <span className="font-semibold text-white">{total.toLocaleString('pt-BR')}</span> questões
-          {areaAtiva && <span> · <span style={{ color: areaAtiva.color ?? '#a3a3ff' }}>{areaAtiva.icon} {areaAtiva.name}</span></span>}
+          {areaAtiva && <span style={{ color: areaAtiva.color ?? '#a3a3ff' }}> · {areaAtiva.icon} {areaAtiva.name}</span>}
           {vestAtivo && <span> · {vestAtivo.name}</span>}
           {filters.ano && <span> · {filters.ano}</span>}
         </p>
       </div>
 
-      {/* ── Filtros ── */}
+      {/* Filtros */}
       <div className="card p-4">
         <div className="flex items-center gap-2 mb-3">
           <SlidersHorizontal size={13} className="text-[var(--text-muted)]" />
           <span className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Filtrar por</span>
           {temFiltro && (
-            <button onClick={clearAllFilters}
+            <button onClick={() => { window.location.href = '/questoes' }}
               className="ml-auto flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-white transition-colors px-2 py-1 rounded-lg"
               style={{ background: 'rgba(255,255,255,0.05)' }}>
-              <RotateCcw size={10} /> Limpar tudo
+              <RotateCcw size={10} /> Limpar
             </button>
           )}
         </div>
-
         <div className="flex flex-wrap gap-2">
-          {/* Disciplina */}
-          <div className="relative">
-            <select
-              value={filters.area ?? ''}
-              onChange={e => e.target.value ? applyFilter('area', e.target.value) : removeFilter('area')}
-              style={{
-                appearance: 'none', WebkitAppearance: 'none',
-                paddingLeft: 14, paddingRight: 36, paddingTop: 10, paddingBottom: 10,
-                borderRadius: 12, fontSize: 14, fontWeight: 500, cursor: 'pointer',
-                outline: 'none', minWidth: 150,
-                background: filters.area ? 'rgba(92,92,255,0.12)' : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${filters.area ? 'rgba(92,92,255,0.35)' : 'rgba(255,255,255,0.08)'}`,
-                color: filters.area ? '#c4c4ff' : '#9898c8',
-              }}>
-              <option value="">Disciplina</option>
-              {areas.map(a => (
-                <option key={a.id} value={a.slug}>{a.name}</option>
-              ))}
-            </select>
-            <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: filters.area ? '#a3a3ff' : '#5a5a8a' }}>
-              <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </div>
-          </div>
-
-          {/* Vestibular */}
-          <div className="relative">
-            <select
-              value={filters.vestibular ?? ''}
-              onChange={e => e.target.value ? applyFilter('vestibular', e.target.value) : removeFilter('vestibular')}
-              style={{
-                appearance: 'none', WebkitAppearance: 'none',
-                paddingLeft: 14, paddingRight: 36, paddingTop: 10, paddingBottom: 10,
-                borderRadius: 12, fontSize: 14, fontWeight: 500, cursor: 'pointer',
-                outline: 'none', minWidth: 150,
-                background: filters.vestibular ? 'rgba(92,92,255,0.12)' : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${filters.vestibular ? 'rgba(92,92,255,0.35)' : 'rgba(255,255,255,0.08)'}`,
-                color: filters.vestibular ? '#c4c4ff' : '#9898c8',
-              }}>
-              <option value="">Vestibular</option>
-              {vestibulares.map(v => (
-                <option key={v.id} value={v.slug}>{v.name}</option>
-              ))}
-            </select>
-            <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: filters.vestibular ? '#a3a3ff' : '#5a5a8a' }}>
-              <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </div>
-          </div>
-
-          {/* Ano */}
-          <div className="relative">
-            <select
-              value={filters.ano ?? ''}
-              onChange={e => e.target.value ? applyFilter('ano', e.target.value) : removeFilter('ano')}
-              style={{
-                appearance: 'none', WebkitAppearance: 'none',
-                paddingLeft: 14, paddingRight: 36, paddingTop: 10, paddingBottom: 10,
-                borderRadius: 12, fontSize: 14, fontWeight: 500, cursor: 'pointer',
-                outline: 'none', minWidth: 120,
-                background: filters.ano ? 'rgba(92,92,255,0.12)' : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${filters.ano ? 'rgba(92,92,255,0.35)' : 'rgba(255,255,255,0.08)'}`,
-                color: filters.ano ? '#c4c4ff' : '#9898c8',
-              }}>
-              <option value="">Ano</option>
-              {Array.from({ length: 2024 - 2011 + 1 }, (_, i) => {
-                const y = 2024 - i
-                return <option key={y} value={String(y)}>{y}</option>
-              })}
-            </select>
-            <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: filters.ano ? '#a3a3ff' : '#5a5a8a' }}>
-              <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </div>
-          </div>
+          <StyledSelect value={filters.area ?? ''} placeholder="Disciplina"
+            onChange={v => v ? applyFilter('area', v) : removeFilter('area')}>
+            {areas.map(a => <option key={a.id} value={a.slug}>{a.name}</option>)}
+          </StyledSelect>
+          <StyledSelect value={filters.vestibular ?? ''} placeholder="Vestibular"
+            onChange={v => v ? applyFilter('vestibular', v) : removeFilter('vestibular')}>
+            {vestibulares.map(v => <option key={v.id} value={v.slug}>{v.name}</option>)}
+          </StyledSelect>
+          <StyledSelect value={filters.ano ?? ''} placeholder="Ano"
+            onChange={v => v ? applyFilter('ano', v) : removeFilter('ano')}>
+            {Array.from({ length: 2024 - 2011 + 1 }, (_, i) => {
+              const y = 2024 - i
+              return <option key={y} value={String(y)}>{y}</option>
+            })}
+          </StyledSelect>
         </div>
-
-        {/* Tags ativas */}
         {temFiltro && (
           <div className="flex flex-wrap gap-2 mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
             {filters.area && areaAtiva && (
@@ -411,7 +399,7 @@ export default function QuestoesClient({
         )}
       </div>
 
-      {/* Questão */}
+      {/* Questão atual */}
       {questions.length === 0 ? (
         <div className="card p-16 text-center">
           <div className="text-5xl mb-4">🔍</div>
@@ -423,7 +411,7 @@ export default function QuestoesClient({
           question={currentQuestion}
           globalIndex={globalIndex}
           total={total}
-          userAnswer={answersMap[currentQuestion.id]}
+          sessionAnswer={sessionAnswers[currentQuestion.id]}
           onAnswer={handleAnswer}
           onNext={goNext}
           onPrev={goPrev}
@@ -435,10 +423,12 @@ export default function QuestoesClient({
       {/* Mini mapa */}
       {questions.length > 1 && (
         <div className="card p-4">
-          <p className="text-xs text-[var(--text-muted)] mb-3 font-semibold uppercase tracking-wider">Questões desta página</p>
+          <p className="text-xs text-[var(--text-muted)] mb-3 font-semibold uppercase tracking-wider">
+            Página {page} de {totalPages} · questões {offset + 1}–{Math.min(offset + pageSize, total)}
+          </p>
           <div className="flex flex-wrap gap-2">
             {questions.map((q, i) => {
-              const ans = answersMap[q.id]
+              const ans = sessionAnswers[q.id]
               const isActive = i === currentIndex
               return (
                 <button key={q.id}
@@ -458,19 +448,27 @@ export default function QuestoesClient({
               )
             })}
           </div>
-          <div className="flex items-center gap-4 mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            {[
-              { color: 'linear-gradient(135deg, #5c5cff, #a855f7)', label: 'Atual' },
-              { color: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)', label: 'Acertou' },
-              { color: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', label: 'Errou' },
-              { color: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', label: 'Pendente' },
-            ].map(s => (
-              <div key={s.label} className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
-                <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: s.color, border: s.border }} />
-                {s.label}
-              </div>
-            ))}
-          </div>
+
+          {/* Navegação entre páginas */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <button
+                onClick={() => { window.location.href = buildUrl({ page: String(page - 1) }) }}
+                disabled={page <= 1}
+                className="text-xs text-[var(--text-muted)] hover:text-white transition-colors disabled:opacity-30 flex items-center gap-1">
+                ← Página anterior
+              </button>
+              <span className="text-xs text-[var(--text-muted)]">
+                {page} / {totalPages}
+              </span>
+              <button
+                onClick={() => { window.location.href = buildUrl({ page: String(page + 1) }) }}
+                disabled={page >= totalPages}
+                className="text-xs text-[var(--text-muted)] hover:text-white transition-colors disabled:opacity-30 flex items-center gap-1">
+                Próxima página →
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

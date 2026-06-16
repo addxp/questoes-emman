@@ -14,7 +14,6 @@ export default async function QuestoesPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  // Busca ou cria perfil
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
   let safeProfile: Profile | null = profile
   if (!safeProfile) {
@@ -29,9 +28,8 @@ export default async function QuestoesPage({
   const { data: vestibulares } = await supabase.from('vestibulares').select('*').order('name')
 
   const page = parseInt(searchParams.page ?? '1')
-  const pageSize = 10
+  const pageSize = 20 // 20 questões por página, navega entre elas uma a uma
 
-  // Resolve IDs a partir dos slugs ANTES da query principal
   let areaId: number | null = null
   let vestibularId: number | null = null
 
@@ -44,7 +42,6 @@ export default async function QuestoesPage({
     vestibularId = found?.id ?? null
   }
 
-  // Query com filtros por ID direto (não por join)
   let query = supabase
     .from('questions')
     .select('*, areas(*), vestibulares(*)', { count: 'exact' })
@@ -59,7 +56,6 @@ export default async function QuestoesPage({
     .order('numero', { ascending: true })
     .range((page - 1) * pageSize, page * pageSize - 1)
 
-  // Respostas do usuário para as questões da página
   const questionIds = (questions ?? []).map(q => q.id as string)
   let userAnswers: { question_id: string; resposta: string; correta: boolean }[] = []
   if (questionIds.length > 0) {

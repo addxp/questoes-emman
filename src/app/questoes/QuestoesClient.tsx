@@ -67,7 +67,6 @@ function QuestionView({ question, globalIndex, total, sessionAnswer, onAnswer, o
   const [selected, setSelected] = useState<string | null>(null)
   const [revealed, setRevealed] = useState(false)
 
-  // Reseta completamente ao trocar de questão
   useEffect(() => {
     setSelected(null)
     setRevealed(false)
@@ -79,9 +78,12 @@ function QuestionView({ question, globalIndex, total, sessionAnswer, onAnswer, o
   const acertou = selected === question.gabarito
 
   const { textoLimpo: contextoLimpo, urls: urlsContexto } = extrairImagens(question.contexto)
-  const { textoLimpo: enunciadoLimpo, urls: urlsEnunciado } = extrairImagens(question.enunciado)
+  const { textoLimpo: enunciadoLimpo, urls: urlsEnunciado } = extrairImagens(question.enunciado ?? '')
   const todasUrls = [...urlsContexto, ...urlsEnunciado, ...(question.imagem_url ? [question.imagem_url] : [])]
     .filter((u, i, a) => a.indexOf(u) === i)
+
+  // ✅ Fix: garante que alternativas nunca é undefined
+  const alternativas = Array.isArray(question.alternativas) ? question.alternativas : []
 
   function handleAnswer(letra: string) {
     if (revealed) return
@@ -171,21 +173,27 @@ function QuestionView({ question, globalIndex, total, sessionAnswer, onAnswer, o
           <p className="text-white text-[15px] leading-relaxed mb-7 font-medium">
             {enunciadoLimpo || question.enunciado}
           </p>
+
+          {/* ✅ Fix: usa `alternativas` com fallback em vez de `question.alternativas` direto */}
           <div className="space-y-2.5">
-            {question.alternativas.map((alt) => (
-              <button key={alt.letra} onClick={() => handleAnswer(alt.letra)} disabled={revealed}
-                className={`alt-option w-full text-left ${getAltClass(alt.letra)}`}>
-                <span className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black"
-                  style={{ background: 'rgba(92,92,255,0.1)', color: '#a3a3ff', minWidth: 32 }}>
-                  {alt.letra}
-                </span>
-                <span className="text-sm text-[var(--text-secondary)] flex-1 leading-relaxed text-left">
-                  {alt.texto}
-                </span>
-                {revealed && alt.letra === question.gabarito && <CheckCircle size={15} className="text-[#22c55e] flex-shrink-0" />}
-                {revealed && alt.letra === selected && alt.letra !== question.gabarito && <XCircle size={15} className="text-[#ef4444] flex-shrink-0" />}
-              </button>
-            ))}
+            {alternativas.length === 0 ? (
+              <p className="text-[var(--text-muted)] text-sm italic">Alternativas não disponíveis.</p>
+            ) : (
+              alternativas.map((alt) => (
+                <button key={alt.letra} onClick={() => handleAnswer(alt.letra)} disabled={revealed}
+                  className={`alt-option w-full text-left ${getAltClass(alt.letra)}`}>
+                  <span className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black"
+                    style={{ background: 'rgba(92,92,255,0.1)', color: '#a3a3ff', minWidth: 32 }}>
+                    {alt.letra}
+                  </span>
+                  <span className="text-sm text-[var(--text-secondary)] flex-1 leading-relaxed text-left">
+                    {alt.texto}
+                  </span>
+                  {revealed && alt.letra === question.gabarito && <CheckCircle size={15} className="text-[#22c55e] flex-shrink-0" />}
+                  {revealed && alt.letra === selected && alt.letra !== question.gabarito && <XCircle size={15} className="text-[#ef4444] flex-shrink-0" />}
+                </button>
+              ))
+            )}
           </div>
 
           {revealed && (
@@ -285,11 +293,9 @@ export default function QuestoesClient({
 
   function goNext() {
     if (currentIndex < questions.length - 1) {
-      // próxima questão na mesma página
       setCurrentIndex(i => i + 1)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } else if (page < totalPages) {
-      // vai para a próxima página (questão 1 dela)
       window.location.href = buildUrl({ page: String(page + 1) })
     }
   }
@@ -299,7 +305,6 @@ export default function QuestoesClient({
       setCurrentIndex(i => i - 1)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } else if (page > 1) {
-      // vai para a última questão da página anterior
       window.location.href = buildUrl({ page: String(page - 1) })
     }
   }

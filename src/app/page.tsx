@@ -24,6 +24,16 @@ const AREAS = [
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-[#06060f] relative overflow-x-hidden">
+      {/* Banner Beta */}
+<div className="fixed top-0 inset-x-0 z-[60] flex items-center justify-center gap-3 py-2 text-xs font-semibold"
+  style={{ background: 'linear-gradient(90deg, #5c5cff, #a855f7, #ec4899)', color: 'white' }}>
+  <span className="px-2 py-0.5 rounded-full text-[10px] font-black"
+    style={{ background: 'rgba(255,255,255,0.2)' }}>
+    BETA
+  </span>
+  Site em fase beta — algumas funcionalidades ainda estão sendo desenvolvidas. Obrigado pela paciência! 🚀
+</div>
+
       {/* Background orbs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-20%] left-[10%] w-[600px] h-[600px] rounded-full opacity-[0.07]"

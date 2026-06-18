@@ -1,6 +1,5 @@
+'use client'
 // src/app/admin/AdminDashboard.tsx
-"use client"
-
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Area, Vestibular } from '@/types'
@@ -17,12 +16,27 @@ interface Stats {
   totalExams: number | null
 }
 
+interface UserRow {
+  id: string
+  email: string
+  name: string | null
+}
+
+interface QuestionRow {
+  id: string
+  enunciado: string
+  ano: number
+  numero: number | null
+  areas: { name: string; icon: string } | null
+  vestibulares: { name: string } | null
+}
+
 interface Props {
   stats: Stats
   areas: Area[]
   vestibulares: Vestibular[]
-  recentQuestions: Record<string, unknown>[]
-  users: { id: string; email: string; name: string | null }[]
+  recentQuestions: QuestionRow[]
+  users: UserRow[]
 }
 
 const EMPTY_FORM = {
@@ -42,7 +56,7 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
 
   // Remoção
   const [searchQ, setSearchQ] = useState('')
-  const [searchResults, setSearchResults] = useState<Record<string, unknown>[]>([])
+  const [searchResults, setSearchResults] = useState<QuestionRow[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -52,7 +66,9 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
   const [pingMsg, setPingMsg] = useState('')
   const [pingLoading, setPingLoading] = useState(false)
 
-  function update(key: string, value: unknown) { setForm(prev => ({ ...prev, [key]: value })) }
+  function update(key: string, value: unknown) {
+    setForm(prev => ({ ...prev, [key]: value }))
+  }
 
   async function handleAddQuestion(e: React.FormEvent) {
     e.preventDefault()
@@ -81,21 +97,20 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
 
   async function handleSearch() {
     if (!searchQ.trim()) return
-    setSearchLoading(true)
+    setSearchLoading(true); setError('')
     const { data, error: err } = await supabase
       .from('questions')
       .select('id, enunciado, ano, numero, areas(name, icon), vestibulares(name)')
       .or(`enunciado.ilike.%${searchQ}%,contexto.ilike.%${searchQ}%`)
       .limit(20)
     if (err) setError('Erro na busca: ' + err.message)
-    setSearchResults(data ?? [])
+    setSearchResults((data ?? []) as unknown as QuestionRow[])
     setSearchLoading(false)
   }
 
   async function handleDelete(id: string) {
     setDeleting(true); setError(''); setSuccess('')
     try {
-      // Usa service role via API route para garantir permissão
       const res = await fetch('/api/admin/delete-question', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -103,7 +118,7 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Erro desconhecido')
-      setSearchResults(prev => prev.filter(q => (q.id as string) !== id))
+      setSearchResults(prev => prev.filter(q => q.id !== id))
       setSuccess('Questão removida com sucesso!')
     } catch (err: unknown) {
       setError('Erro ao deletar: ' + (err instanceof Error ? err.message : String(err)))
@@ -123,37 +138,45 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
   async function handlePing() {
     if (!pingTitle.trim() || !pingMsg.trim()) { setError('Preencha título e mensagem.'); return }
     setPingLoading(true); setError(''); setSuccess('')
-    const res = await fetch('/api/admin/ping-users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: pingTitle, message: pingMsg }),
-    })
-    const json = await res.json()
-    if (!res.ok) setError(json.error ?? 'Erro ao enviar')
-    else {
-      setSuccess(`✅ E-mail enviado para ${json.sent} usuários!`)
+    try {
+      const res = await fetch('/api/admin/ping-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: pingTitle, message: pingMsg }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Erro ao enviar')
+      setSuccess(`E-mail enviado para ${json.sent} usuários!`)
       setPingTitle(''); setPingMsg('')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err))
     }
     setPingLoading(false)
   }
 
   const TABS = [
-    { key: 'dashboard', label: 'Dashboard',         icon: BarChart2 },
-    { key: 'add',       label: 'Adicionar',          icon: Plus },
-    { key: 'remove',    label: 'Remover Questão',    icon: Trash2 },
-    { key: 'generate',  label: 'Gerar Prova',        icon: Zap },
-    { key: 'ping',      label: 'Ping Usuários',      icon: Mail },
+    { key: 'dashboard', label: 'Dashboard',      icon: BarChart2 },
+    { key: 'add',       label: 'Adicionar',       icon: Plus },
+    { key: 'remove',    label: 'Remover Questão', icon: Trash2 },
+    { key: 'generate',  label: 'Gerar Prova',     icon: Zap },
+    { key: 'ping',      label: 'Ping Usuários',   icon: Mail },
   ] as const
+
+  // Garante que users é sempre array (segurança contra undefined)
+  const safeUsers = users ?? []
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-3">
         <div className="p-3 rounded-xl" style={{ background: 'rgba(251,191,36,0.12)' }}>
           <Trophy size={24} className="text-[#fbbf24]" />
         </div>
         <div>
           <h1 className="text-2xl font-black text-white">Painel Admin</h1>
-          <p className="text-[var(--text-secondary)] text-sm">{stats.totalUsers ?? 0} usuários · {stats.totalQuestions ?? 0} questões</p>
+          <p className="text-[var(--text-secondary)] text-sm">
+            {stats.totalUsers ?? 0} usuários · {stats.totalQuestions ?? 0} questões
+          </p>
         </div>
       </div>
 
@@ -161,7 +184,8 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
       <div className="flex flex-wrap gap-1 p-1 rounded-xl w-fit"
         style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
         {TABS.map(t => (
-          <button key={t.key} onClick={() => { setTab(t.key); setSuccess(''); setError('') }}
+          <button key={t.key}
+            onClick={() => { setTab(t.key); setSuccess(''); setError('') }}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all"
             style={tab === t.key
               ? { background: 'linear-gradient(135deg, #5c5cff, #a855f7)', color: 'white' }
@@ -171,6 +195,7 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
         ))}
       </div>
 
+      {/* Alertas */}
       {error   && <div className="p-3 rounded-xl text-sm" style={{ background: 'rgba(239,68,68,0.1)',  color: '#fca5a5', border: '1px solid rgba(239,68,68,0.2)'  }}>⚠️ {error}</div>}
       {success && <div className="p-3 rounded-xl text-sm" style={{ background: 'rgba(34,197,94,0.1)', color: '#86efac', border: '1px solid rgba(34,197,94,0.2)' }}>✅ {success}</div>}
 
@@ -189,23 +214,26 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
                   <s.icon size={18} style={{ color: s.color }} />
                   <span className="text-xs text-[var(--text-muted)]">{s.label}</span>
                 </div>
-                <div className="text-3xl font-black text-white">{(s.value ?? 0).toLocaleString('pt-BR')}</div>
+                <div className="text-3xl font-black text-white">
+                  {(s.value ?? 0).toLocaleString('pt-BR')}
+                </div>
               </div>
             ))}
           </div>
 
-          {/* Lista de usuários */}
+          {/* Usuários recentes */}
           <div className="card p-6">
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <Users size={18} className="text-[var(--text-muted)]" /> Usuários cadastrados
+              <Users size={18} className="text-[var(--text-muted)]" />
+              Usuários cadastrados ({safeUsers.length})
             </h2>
-            <div className="space-y-2">
-              {users.slice(0, 10).map(u => (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {safeUsers.slice(0, 15).map(u => (
                 <div key={u.id} className="flex items-center gap-3 p-3 rounded-xl"
                   style={{ background: 'rgba(255,255,255,0.03)' }}>
                   <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
                     style={{ background: 'linear-gradient(135deg, #5c5cff, #a855f7)' }}>
-                    {(u.name || u.email)[0].toUpperCase()}
+                    {(u.name || u.email || '?')[0].toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm text-white font-medium truncate">{u.name || 'Sem nome'}</div>
@@ -213,31 +241,30 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
                   </div>
                 </div>
               ))}
-              {users.length > 10 && (
+              {safeUsers.length > 15 && (
                 <p className="text-xs text-[var(--text-muted)] text-center pt-2">
-                  +{users.length - 10} outros usuários
+                  +{safeUsers.length - 15} outros usuários
                 </p>
               )}
             </div>
           </div>
 
+          {/* Últimas questões */}
           <div className="card p-6">
-            <h2 className="text-lg font-bold text-white mb-4">Últimas questões</h2>
+            <h2 className="text-lg font-bold text-white mb-4">Últimas questões adicionadas</h2>
             <div className="space-y-3">
-              {recentQuestions.map((q) => {
-                const area = q.areas as Record<string, unknown> | undefined
-                const vest = q.vestibulares as Record<string, unknown> | undefined
-                return (
-                  <div key={q.id as string} className="flex items-center gap-3 p-3 rounded-xl"
-                    style={{ background: 'rgba(255,255,255,0.03)' }}>
-                    <span className="text-lg flex-shrink-0">{area?.icon as string}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white truncate">{(q.enunciado as string)?.substring(0, 80)}…</p>
-                      <p className="text-xs text-[var(--text-muted)]">{vest?.name as string} {q.ano as number} · {area?.name as string}</p>
-                    </div>
+              {recentQuestions.map(q => (
+                <div key={q.id} className="flex items-center gap-3 p-3 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.03)' }}>
+                  <span className="text-lg flex-shrink-0">{q.areas?.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white truncate">{q.enunciado?.substring(0, 80)}…</p>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {q.vestibulares?.name} {q.ano} · {q.areas?.name}
+                    </p>
                   </div>
-                )
-              })}
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -272,7 +299,8 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
             <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wide">Número</label>
-                <input type="number" className="input" placeholder="ex: 12" value={form.numero} onChange={e => update('numero', e.target.value)} />
+                <input type="number" className="input" placeholder="ex: 12"
+                  value={form.numero} onChange={e => update('numero', e.target.value)} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wide">Dificuldade</label>
@@ -285,11 +313,13 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wide">Contexto</label>
-              <textarea className="input resize-none" rows={3} value={form.contexto} onChange={e => update('contexto', e.target.value)} />
+              <textarea className="input resize-none" rows={3} value={form.contexto}
+                onChange={e => update('contexto', e.target.value)} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wide">Enunciado *</label>
-              <textarea className="input resize-none" rows={4} value={form.enunciado} onChange={e => update('enunciado', e.target.value)} required />
+              <textarea className="input resize-none" rows={4} value={form.enunciado}
+                onChange={e => update('enunciado', e.target.value)} required />
             </div>
             <div className="space-y-3">
               <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">Alternativas *</label>
@@ -305,8 +335,10 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
                     value={(form as Record<string, unknown>)[`alt_${l.toLowerCase()}`] as string}
                     onChange={e => update(`alt_${l.toLowerCase()}`, e.target.value)} required />
                   <button type="button" onClick={() => update('gabarito', l)}
-                    className="px-3 py-2 rounded-lg text-xs font-semibold transition-all"
-                    style={{ background: form.gabarito === l ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.04)', color: form.gabarito === l ? '#86efac' : 'var(--text-muted)' }}>
+                    className="px-3 py-2 rounded-lg text-xs font-semibold transition-all flex-shrink-0"
+                    style={form.gabarito === l
+                      ? { background: 'rgba(34,197,94,0.15)', color: '#86efac' }
+                      : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)' }}>
                     {form.gabarito === l ? <Check size={14} /> : 'Gabarito'}
                   </button>
                 </div>
@@ -314,10 +346,12 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wide">Resolução comentada</label>
-              <textarea className="input resize-none" rows={4} value={form.explicacao} onChange={e => update('explicacao', e.target.value)} />
+              <textarea className="input resize-none" rows={4} value={form.explicacao}
+                onChange={e => update('explicacao', e.target.value)} />
             </div>
             <button type="submit" disabled={loading} className="btn-primary">
-              {loading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Salvar Questão
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+              Salvar Questão
             </button>
           </form>
         </div>
@@ -327,62 +361,69 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
       {tab === 'remove' && (
         <div className="card p-6">
           <h2 className="text-lg font-bold text-white mb-2">Remover Questão</h2>
-          <p className="text-[var(--text-secondary)] text-sm mb-6">Busque pelo texto para encontrar e remover questões.</p>
+          <p className="text-[var(--text-secondary)] text-sm mb-6">
+            Busque pelo texto do enunciado para encontrar e remover questões.
+          </p>
           <div className="flex gap-3 mb-6">
-            <input type="text" className="input flex-1" placeholder="Digite parte do enunciado..."
+            <input type="text" className="input flex-1"
+              placeholder="Digite parte do enunciado..."
               value={searchQ} onChange={e => setSearchQ(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSearch()} />
             <button onClick={handleSearch} disabled={searchLoading} className="btn-primary flex-shrink-0">
-              {searchLoading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />} Buscar
+              {searchLoading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+              Buscar
             </button>
           </div>
 
           {searchResults.length === 0 && searchQ && !searchLoading && (
-            <p className="text-center py-8 text-[var(--text-muted)] text-sm">Nenhuma questão encontrada.</p>
+            <p className="text-center py-8 text-[var(--text-muted)] text-sm">
+              Nenhuma questão encontrada para &quot;{searchQ}&quot;
+            </p>
           )}
 
           <div className="space-y-3">
-            {searchResults.map(q => {
-              const area = q.areas as Record<string, unknown> | undefined
-              const vest = q.vestibulares as Record<string, unknown> | undefined
-              return (
-                <div key={q.id as string} className="p-4 rounded-xl flex items-start gap-4"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="text-xs font-semibold" style={{ color: '#a3a3ff' }}>{vest?.name as string} {q.ano as number}</span>
-                      {q.numero && <span className="text-xs text-[var(--text-muted)]">· Q{q.numero as number}</span>}
-                      <span className="text-xs text-[var(--text-muted)]">· {area?.icon as string} {area?.name as string}</span>
-                    </div>
-                    <p className="text-sm text-white leading-relaxed line-clamp-2">{q.enunciado as string}</p>
+            {searchResults.map(q => (
+              <div key={q.id} className="p-4 rounded-xl flex items-start gap-4"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <span className="text-xs font-semibold" style={{ color: '#a3a3ff' }}>
+                      {q.vestibulares?.name} {q.ano}
+                    </span>
+                    {q.numero && <span className="text-xs text-[var(--text-muted)]">· Q{q.numero}</span>}
+                    <span className="text-xs text-[var(--text-muted)]">
+                      · {q.areas?.icon} {q.areas?.name}
+                    </span>
                   </div>
-
-                  {confirmDelete === (q.id as string) ? (
-                    <div className="flex flex-col gap-2 flex-shrink-0 items-end">
-                      <div className="flex items-center gap-1 text-xs text-[#fca5a5]">
-                        <AlertTriangle size={12} /> Tem certeza?
-                      </div>
-                      <button onClick={() => handleDelete(q.id as string)} disabled={deleting}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white flex items-center gap-1"
-                        style={{ background: '#ef4444' }}>
-                        {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Confirmar
-                      </button>
-                      <button onClick={() => setConfirmDelete(null)}
-                        className="px-3 py-1.5 rounded-lg text-xs text-[var(--text-muted)]"
-                        style={{ background: 'rgba(255,255,255,0.05)' }}>
-                        Cancelar
-                      </button>
-                    </div>
-                  ) : (
-                    <button onClick={() => setConfirmDelete(q.id as string)}
-                      className="flex-shrink-0 p-2 rounded-xl transition-all hover:scale-105"
-                      style={{ background: 'rgba(239,68,68,0.1)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.2)' }}>
-                      <Trash2 size={16} />
-                    </button>
-                  )}
+                  <p className="text-sm text-white leading-relaxed line-clamp-2">{q.enunciado}</p>
                 </div>
-              )
-            })}
+
+                {confirmDelete === q.id ? (
+                  <div className="flex flex-col gap-2 flex-shrink-0 items-end">
+                    <div className="flex items-center gap-1 text-xs text-[#fca5a5]">
+                      <AlertTriangle size={12} /> Tem certeza?
+                    </div>
+                    <button onClick={() => handleDelete(q.id)} disabled={deleting}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5"
+                      style={{ background: '#ef4444' }}>
+                      {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                      Confirmar
+                    </button>
+                    <button onClick={() => setConfirmDelete(null)}
+                      className="px-3 py-1.5 rounded-lg text-xs text-[var(--text-muted)]"
+                      style={{ background: 'rgba(255,255,255,0.05)' }}>
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => setConfirmDelete(q.id)}
+                    className="flex-shrink-0 p-2.5 rounded-xl transition-all hover:scale-105"
+                    style={{ background: 'rgba(239,68,68,0.1)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.2)' }}>
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -394,9 +435,12 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
             <Zap size={36} className="text-[#a3a3ff]" />
           </div>
           <h2 className="text-xl font-black text-white mb-3">Gerar Enem do Emman</h2>
-          <p className="text-[var(--text-secondary)] text-sm mb-8">45 questões de Humanas + 45 de Exatas, geradas aleatoriamente.</p>
+          <p className="text-[var(--text-secondary)] text-sm mb-8">
+            45 questões de Humanas + 45 de Exatas, sorteadas aleatoriamente do banco.
+          </p>
           <button onClick={handleGenerateExam} disabled={loading} className="btn-primary mx-auto">
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />} Gerar Prova
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
+            Gerar Prova desta Semana
           </button>
         </div>
       )}
@@ -409,8 +453,10 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
               <Mail size={22} className="text-[#a3a3ff]" />
             </div>
             <div>
-              <h2 className="text-lg font-black text-white">Ping — Mencionar Todos</h2>
-              <p className="text-[var(--text-secondary)] text-sm">Envia e-mail para todos os {users.length} usuários cadastrados</p>
+              <h2 className="text-lg font-black text-white">Ping — Notificar Todos</h2>
+              <p className="text-[var(--text-secondary)] text-sm">
+                Envia e-mail para todos os {safeUsers.length} usuários
+              </p>
             </div>
           </div>
 
@@ -421,24 +467,29 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
 
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wide">Assunto</label>
-              <input type="text" className="input" placeholder="ex: Nova prova semanal disponível!"
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wide">
+                Assunto
+              </label>
+              <input type="text" className="input"
+                placeholder="ex: Nova prova semanal disponível!"
                 value={pingTitle} onChange={e => setPingTitle(e.target.value)} />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wide">Mensagem</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wide">
+                Mensagem
+              </label>
               <textarea className="input resize-none" rows={6}
-                placeholder="Escreva a mensagem que será enviada para todos os usuários..."
+                placeholder="Escreva a mensagem que todos receberão por e-mail..."
                 value={pingMsg} onChange={e => setPingMsg(e.target.value)} />
             </div>
 
-            {/* Preview dos destinatários */}
+            {/* Preview destinatários */}
             <div className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
               <p className="text-xs font-semibold text-[var(--text-muted)] mb-3 uppercase tracking-wide">
-                Destinatários ({users.length})
+                Destinatários ({safeUsers.length})
               </p>
-              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                {users.map(u => (
+              <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto">
+                {safeUsers.map(u => (
                   <span key={u.id} className="text-xs px-2 py-1 rounded-full"
                     style={{ background: 'rgba(92,92,255,0.1)', color: '#a3a3ff', border: '1px solid rgba(92,92,255,0.2)' }}>
                     {u.email}
@@ -447,7 +498,8 @@ export default function AdminDashboard({ stats, areas, vestibulares, recentQuest
               </div>
             </div>
 
-            <button onClick={handlePing} disabled={pingLoading || !pingTitle || !pingMsg}
+            <button onClick={handlePing}
+              disabled={pingLoading || !pingTitle.trim() || !pingMsg.trim()}
               className="btn-primary w-full justify-center disabled:opacity-40">
               {pingLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
               Enviar para todos os usuários
